@@ -2,6 +2,7 @@ import { ROLLEN, TRUPP_NAME_MAX, type Trupp, type TruppSummary } from '@apas/sha
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
+import { EinladungsLink } from '../components/EinladungsLink';
 import { HauptNav } from '../components/HauptNav';
 import { Icon } from '../components/Icon';
 import { TruppName } from '../components/TruppName';
@@ -114,6 +115,20 @@ export function TruppDashboard() {
               </button>
             </div>
           ))}
+
+        {ausbilder && trupps !== null && (
+          <EinladungsLink
+            titel="Teilnehmer einladen"
+            link={`${window.location.origin}/registrieren`}
+            qrAlt="QR-Code zur Registrierung"
+            beschreibung={
+              <>
+                Ein Link für alle: Wer sich damit registriert, wählt danach selbst seinen Trupp. Der Einladungslink
+                in jedem Trupp führt weiterhin direkt in diesen Trupp.
+              </>
+            }
+          />
+        )}
       </main>
     </>
   );

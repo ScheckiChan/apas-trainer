@@ -1,0 +1,39 @@
+/* Shareable link card (Trupp invite link, instance-wide /registrieren link). */
+.einladung {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.einladung > .stack {
+  flex: 1;
+  min-width: 0;
+}
+
+.einladung h2 {
+  margin: 0;
+}
+
+.einladung .stack > .einladung-text {
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+  max-width: 60ch;
+}
+
+/* The QR stays dark-on-white in both schemes so every camera reads it. */
+.einladung-qr {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+
+@media (max-width: 460px) {
+  .einladung {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .einladung-qr {
+    align-self: center;
+  }
+}

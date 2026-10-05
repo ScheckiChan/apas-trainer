@@ -164,25 +164,7 @@
   color: var(--danger);
 }
 
-.gd-invite {
-  display: flex;
-  gap: var(--space-4);
-  align-items: center;
-}
-
-.gd-invite > .stack {
-  flex: 1;
-  min-width: 0;
-}
-
-/* The QR stays dark-on-white in both schemes so every camera reads it. */
-.gd-qr {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  flex-shrink: 0;
-}
-
-/* ---------- Ressourcen ---------- */
+/* Einladungslink card: components/EinladungsLink.css */
 
 @media (max-width: 860px) {
   .gd-tn {
@@ -222,17 +204,6 @@
   .gd-add-form,
   .gd-grid {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 460px) {
-  .gd-invite {
-    flex-direction: column-reverse;
-    align-items: stretch;
-  }
-
-  .gd-qr {
-    align-self: center;
   }
 }
 

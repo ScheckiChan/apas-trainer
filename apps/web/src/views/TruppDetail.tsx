@@ -12,11 +12,11 @@ import {
   type TeilnehmerCreateResponse,
   type TeilnehmerZuordnenRequest,
 } from '@apas/shared';
-import QRCode from 'qrcode';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
+import { EinladungsLink } from '../components/EinladungsLink';
 import { EinmalPasswort } from '../components/EinmalPasswort';
 import { Icon } from '../components/Icon';
 import { RolleSelect, RollenAbdeckung, saveRolle } from '../components/Rollen';
@@ -549,25 +549,6 @@ function PruefungsterminEditor({ trupp, onSaved }: { trupp: Trupp; onSaved: (tru
 
 function InvitePanel({ trupp, onRegenerated }: { trupp: Trupp; onRegenerated: (trupp: Trupp) => void }) {
   const link = `${window.location.origin}/join/${trupp.inviteToken ?? ''}`;
-  const [qr, setQr] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    // Literal colours: the QR is a raster image (dark = --ink), kept dark-on-white in both schemes.
-    QRCode.toDataURL(link, { width: 220, margin: 1, color: { dark: '#221716', light: '#ffffff' } })
-      .then(setQr)
-      .catch(() => setQr(null));
-  }, [link]);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      prompt('Link kopieren:', link);
-    }
-  };
 
   const regenerate = async () => {
     if (!confirm('Neuen Einladungslink erzeugen? Der bisherige Link funktioniert danach nicht mehr.')) return;
@@ -579,22 +560,11 @@ function InvitePanel({ trupp, onRegenerated }: { trupp: Trupp; onRegenerated: (t
   };
 
   return (
-    <section className="card gd-invite">
-      <div className="stack">
-        <h2>Einladungslink</h2>
-        <input readOnly value={link} onFocus={(e) => e.target.select()} aria-label="Einladungslink" />
-        <div className="btn-row">
-          <button type="button" className="btn btn-secondary btn-small" onClick={copy}>
-            <Icon name={copied ? 'check' : 'copy'} />
-            {copied ? 'Kopiert' : 'Kopieren'}
-          </button>
-          <button type="button" className="btn btn-ghost btn-small" onClick={regenerate}>
-            <Icon name="refresh-cw" />
-            Neu erzeugen
-          </button>
-        </div>
-      </div>
-      {qr && <img className="gd-qr" src={qr} alt="QR-Code zum Einladungslink" width={150} height={150} />}
-    </section>
+    <EinladungsLink titel="Einladungslink für diesen Trupp" link={link} qrAlt="QR-Code zum Einladungslink">
+      <button type="button" className="btn btn-ghost btn-small" onClick={regenerate}>
+        <Icon name="refresh-cw" />
+        Neu erzeugen
+      </button>
+    </EinladungsLink>
   );
 }
