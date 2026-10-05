@@ -5,6 +5,7 @@ import {
   type Rolle,
   type Ressource,
   type Teilnehmer,
+  type TeilnehmerCreateResponse,
 } from '@apas/shared';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
@@ -125,8 +126,14 @@ export function GroupDetail() {
             </span>
           </div>
           {teilnehmer.length > 0 && <RollenAbdeckung teilnehmer={teilnehmer} />}
+          <AddTeilnehmer
+            gruppeId={gruppe.id}
+            onAdded={(t) => setTeilnehmer((list) => [...list, t].sort((a, b) => a.name.localeCompare(b.name, 'de')))}
+          />
           {teilnehmer.length === 0 ? (
-            <p className="muted">Noch niemand beigetreten. Teile den Einladungslink oder QR-Code.</p>
+            <p className="muted">
+              Noch niemand beigetreten. Teile den Einladungslink oder QR-Code — oder füge Personen direkt hinzu.
+            </p>
           ) : (
             <ul className="gd-tn-list">
               {teilnehmer.map((t) => (
@@ -156,6 +163,117 @@ export function GroupDetail() {
         <RessourcenPanel gruppeId={gruppe.id} />
       </main>
     </>
+  );
+}
+
+/**
+ * Direct add without the invite link (e.g. pre-populating a Trupp). The generated password
+ * is only in the API response, so it is shown exactly once here.
+ */
+function AddTeilnehmer({ gruppeId, onAdded }: { gruppeId: string; onAdded: (t: Teilnehmer) => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [ff, setFf] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<TeilnehmerCreateResponse | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api<TeilnehmerCreateResponse>(`/gruppen/${gruppeId}/teilnehmer`, {
+        method: 'POST',
+        auth: 'leiter',
+        body: { name, ff },
+      });
+      onAdded(res.teilnehmer);
+      setCreated(res);
+      setCopied(false);
+      setName('');
+      setOpen(false);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!created) return;
+    try {
+      await navigator.clipboard.writeText(created.tempPassword);
+      setCopied(true);
+    } catch {
+      prompt('Passwort kopieren:', created.tempPassword);
+    }
+  };
+
+  return (
+    <div className="gd-add">
+      {created && (
+        <div className="alert alert-ok gd-add-result" role="status">
+          <div>
+            Zugang für <strong>{created.teilnehmer.name}</strong>: Passwort{' '}
+            <code className="gd-temp-pw">{created.tempPassword}</code> — jetzt weitergeben, wird nicht erneut
+            angezeigt. Anmeldung über den Einladungslink → „Anmelden" mit Name + Passwort.
+          </div>
+          <div className="btn-row">
+            <button type="button" className="btn btn-secondary btn-small" onClick={copy}>
+              {copied ? '✓ Kopiert' : 'Passwort kopieren'}
+            </button>
+            <button type="button" className="btn btn-ghost btn-small" onClick={() => setCreated(null)}>
+              Schließen
+            </button>
+          </div>
+        </div>
+      )}
+      {open ? (
+        <form className="gd-add-form" onSubmit={submit}>
+          {error && <div className="alert alert-error gd-add-error">{error}</div>}
+          <input
+            required
+            minLength={2}
+            maxLength={100}
+            placeholder="Name, z. B. Max Mustermann"
+            aria-label="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
+          <input
+            required
+            minLength={2}
+            maxLength={100}
+            placeholder="FF, z. B. FF Fels"
+            aria-label="Feuerwehr"
+            value={ff}
+            onChange={(e) => setFf(e.target.value)}
+          />
+          <div className="btn-row">
+            <button className="btn" type="submit" disabled={busy}>
+              Hinzufügen
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setOpen(false);
+                setError(null);
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button type="button" className="btn btn-secondary btn-small" onClick={() => setOpen(true)}>
+          + Person hinzufügen
+        </button>
+      )}
+    </div>
   );
 }
 

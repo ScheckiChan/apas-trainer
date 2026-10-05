@@ -103,7 +103,46 @@
   gap: 0.5rem;
 }
 
+.gd-add {
+  margin-bottom: 0.75rem;
+}
+
+.gd-add-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.gd-temp-pw {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: #fff;
+  border: 1px solid #a5d6a7;
+  border-radius: 6px;
+  padding: 0.05rem 0.4rem;
+  user-select: all;
+  white-space: nowrap;
+}
+
+.gd-add-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.gd-add-error {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 720px) {
+  .gd-add-form {
+    grid-template-columns: 1fr;
+  }
+
   .gd-grid {
     grid-template-columns: 1fr;
   }
