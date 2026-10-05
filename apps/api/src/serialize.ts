@@ -13,17 +13,15 @@ export function toGruppe(g: GruppeRecord, opts: { includeInvite: boolean }): Gru
   };
 }
 
-export function toTeilnehmer(t: TeilnehmerRecord, opts: { includeEmail: boolean }): Teilnehmer {
+export function toTeilnehmer(t: TeilnehmerRecord): Teilnehmer {
   return {
     id: t.id,
     gruppeId: t.gruppeId,
     name: t.name,
     ff: t.ff,
-    rolle: t.rolle,
-    emailVerified: t.emailVerified,
+    rolle: t.rolle ?? null,
     joinedAt: t.joinedAt,
     checkliste: t.checkliste,
-    ...(opts.includeEmail ? { email: t.email } : {}),
   };
 }
 

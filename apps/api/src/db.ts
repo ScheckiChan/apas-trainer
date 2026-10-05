@@ -26,9 +26,9 @@ export interface TeilnehmerRecord {
   gruppeId: string;
   name: string;
   ff: string;
-  rolle: Rolle;
-  email: string;
-  emailVerified: boolean;
+  rolle: Rolle | null;
+  /** bcrypt hash. Missing only on legacy records from the magic-link era (claimable via join). */
+  passwordHash?: string;
   joinedAt: string;
   checkliste: Checkliste;
 }
@@ -51,15 +51,6 @@ export interface TerminRecord {
   ressourceId: string | null;
   createdBy: string;
   createdAt: string;
-}
-
-export interface MagicLinkRecord {
-  id: string;
-  /** sha256 of the token sent by mail — the raw token is never stored. */
-  tokenHash: string;
-  teilnehmerId: string;
-  expiresAt: string;
-  usedAt: string | null;
 }
 
 export type PushOwner = { kind: 'leiter'; id: string } | { kind: 'teilnehmer'; id: string };
@@ -88,7 +79,6 @@ export const db = {
   teilnehmer: new JsonCollection<TeilnehmerRecord>(dir, 'teilnehmer'),
   ressourcen: new JsonCollection<RessourceRecord>(dir, 'ressourcen'),
   termine: new JsonCollection<TerminRecord>(dir, 'termine'),
-  magicLinks: new JsonCollection<MagicLinkRecord>(dir, 'magiclinks'),
   pushSubscriptions: new JsonCollection<PushSubscriptionRecord>(dir, 'pushsubscriptions'),
   reminders: new JsonCollection<ReminderRecord>(dir, 'reminders'),
 };

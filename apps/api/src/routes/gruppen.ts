@@ -81,12 +81,9 @@ gruppenRouter.post('/:gruppeId/invite/regenerate', requireLeiter, async (req, re
 
 gruppenRouter.get('/:gruppeId/teilnehmer', requireAny, async (req, res) => {
   const g = await loadGruppeForPrincipal(req);
-  const owner = isOwner(req, g);
   const list = await db.teilnehmer.find((t) => t.gruppeId === g.id);
   list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  res.json(
-    list.map((t) => toTeilnehmer(t, { includeEmail: owner || t.id === req.teilnehmer?.sub })),
-  );
+  res.json(list.map(toTeilnehmer));
 });
 
 const checkStatus = z.enum(['ok', 'offen']);
@@ -107,12 +104,14 @@ gruppenRouter.patch('/:gruppeId/teilnehmer/:teilnehmerId/checkliste', requireAny
   const updated = await db.teilnehmer.update((items) => {
     const t = items.find((x) => x.id === teilnehmerId && x.gruppeId === g.id);
     if (!t) return { items, result: undefined };
-    if (t.rolle === 'GKDT') delete input.tauglichkeit; // not applicable for GKDT
+    // Not applicable for whoever holds GKDT right now. The stored value is kept, so it
+    // comes back unchanged if the Rolle is reassigned later.
+    if (t.rolle === 'GKDT') delete input.tauglichkeit;
     t.checkliste = { ...t.checkliste, ...input };
     return { items, result: t };
   });
   if (!updated) throw new HttpError(404, 'Teilnehmer nicht gefunden');
-  res.json(toTeilnehmer(updated, { includeEmail: true }));
+  res.json(toTeilnehmer(updated));
 });
 
 gruppenRouter.delete('/:gruppeId/teilnehmer/:teilnehmerId', requireLeiter, async (req, res) => {
@@ -126,7 +125,6 @@ gruppenRouter.delete('/:gruppeId/teilnehmer/:teilnehmerId', requireLeiter, async
     ),
     result: undefined,
   }));
-  await db.magicLinks.remove((m) => m.teilnehmerId === teilnehmerId);
   await removeSubscriptionsOf({ kind: 'teilnehmer', id: teilnehmerId });
   res.status(204).end();
 });

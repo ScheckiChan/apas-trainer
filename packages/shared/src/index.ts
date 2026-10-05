@@ -24,6 +24,13 @@ export const ROLLE_SHORT: Record<Rolle, string> = {
   WASSERTRUPPFUEHRER: 'WTF',
 };
 
+/** How many Teilnehmer currently hold each Rolle. Duplicates are allowed (Ergänzungsteilnehmer). */
+export function rollenBesetzung(teilnehmer: readonly { rolle: Rolle | null }[]): Record<Rolle, number> {
+  const counts = Object.fromEntries(ROLLEN.map((r) => [r, 0])) as Record<Rolle, number>;
+  for (const t of teilnehmer) if (t.rolle) counts[t.rolle]++;
+  return counts;
+}
+
 // ---------------------------------------------------------------------------
 // Checkliste
 // ---------------------------------------------------------------------------
@@ -48,20 +55,23 @@ export const CHECKLIST_LABELS: Record<ChecklistItem, string> = {
 
 export const EMPTY_CHECKLISTE: Checkliste = { at: 'offen', ats3: 'offen', tauglichkeit: 'offen' };
 
-/** Which checklist items apply to a Rolle. GKDT does not require Tauglichkeit. */
-export function isChecklistItemRequired(rolle: Rolle, item: ChecklistItem): boolean {
+/**
+ * Which checklist items apply to a Rolle. Whoever currently holds GKDT does not need
+ * Tauglichkeit; without a Rolle (null) every item is required.
+ */
+export function isChecklistItemRequired(rolle: Rolle | null, item: ChecklistItem): boolean {
   if (item === 'tauglichkeit' && rolle === 'GKDT') return false;
   return true;
 }
 
-export function requiredChecklistItems(rolle: Rolle): ChecklistItem[] {
+export function requiredChecklistItems(rolle: Rolle | null): ChecklistItem[] {
   return CHECKLIST_ITEMS.filter((i) => isChecklistItemRequired(rolle, i));
 }
 
 /** Ampel: gruen = all required ok, gelb = some ok, rot = none ok. */
 export type Ampel = 'gruen' | 'gelb' | 'rot';
 
-export function checklistAmpel(rolle: Rolle, checkliste: Checkliste): Ampel {
+export function checklistAmpel(rolle: Rolle | null, checkliste: Checkliste): Ampel {
   const required = requiredChecklistItems(rolle);
   const done = required.filter((i) => checkliste[i] === 'ok').length;
   if (done === required.length) return 'gruen';
@@ -100,10 +110,8 @@ export interface Teilnehmer {
   gruppeId: string;
   name: string;
   ff: string;
-  rolle: Rolle;
-  /** Only present for the Ausbildungsleiter or the Teilnehmer themself. */
-  email?: string;
-  emailVerified: boolean;
+  /** Assigned in the Gruppe at any time (not at join). null = noch keine Rolle. */
+  rolle: Rolle | null;
   joinedAt: string;
   checkliste: Checkliste;
 }
@@ -176,8 +184,16 @@ export interface JoinInfo {
 export interface JoinRequest {
   name: string;
   ff: string;
-  rolle: Rolle;
-  email: string;
+  password: string;
+}
+
+export interface TeilnehmerLoginRequest {
+  name: string;
+  password: string;
+}
+
+export interface RolleUpdate {
+  rolle: Rolle | null;
 }
 
 export interface TerminInput {

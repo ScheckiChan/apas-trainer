@@ -7,6 +7,7 @@ import { authRouter } from './routes/auth.js';
 import { gruppenRouter } from './routes/gruppen.js';
 import { joinRouter } from './routes/join.js';
 import { pushRouter } from './routes/push.js';
+import { teilnehmerRouter } from './routes/teilnehmer.js';
 import { termineRouter } from './routes/termine.js';
 
 export function createApp() {
@@ -19,30 +20,36 @@ export function createApp() {
   }
   app.use(express.json({ limit: '100kb' }));
 
-  // General limiter for the whole API, stricter one for unauthenticated auth/join endpoints.
+  // General limiter for the whole API, stricter ones for the unauthenticated auth endpoints.
   const apiLimiter = rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false });
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60_000,
-    limit: 20,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    message: { error: 'Zu viele Versuche — bitte später erneut probieren' },
-  });
+  const strict = (opts: { limit: number; skipSuccessfulRequests?: boolean }) =>
+    rateLimit({
+      windowMs: 15 * 60_000,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: { error: 'Zu viele Versuche — bitte später erneut probieren' },
+      ...opts,
+    });
+  // Password logins: only failed attempts count, so a whole Gruppe behind one NAT can
+  // still sign in, while brute force is capped at 20 wrong passwords per 15 min and IP.
+  const loginLimiter = strict({ limit: 20, skipSuccessfulRequests: true });
+  // Joining creates accounts — every attempt counts.
+  const joinLimiter = strict({ limit: 30 });
 
   app.use('/api', apiLimiter);
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
 
-  app.use('/api/auth/leiter/login', authLimiter);
-  app.use('/api/auth/teilnehmer/request-link', authLimiter);
-  app.use('/api/auth/teilnehmer/verify', authLimiter);
-  app.post('/api/join/:token', authLimiter);
+  app.use('/api/auth/leiter/login', loginLimiter);
+  app.post('/api/gruppen/:token/login', loginLimiter);
+  app.post('/api/gruppen/:token/join', joinLimiter);
 
   app.use('/api/auth', authRouter);
-  app.use('/api/join', joinRouter);
   app.use('/api/gruppen/:gruppeId/termine', termineRouter);
+  app.use('/api/gruppen', joinRouter);
   app.use('/api/gruppen', gruppenRouter);
+  app.use('/api/teilnehmer', teilnehmerRouter);
   app.use('/api/push', pushRouter);
 
   app.use('/api', (_req, res) => {

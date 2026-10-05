@@ -4,13 +4,13 @@
  *   npm run seed-admin                       # interactive prompts
  *   ADMIN_EMAIL=a@b.at ADMIN_PASSWORD=... npm run seed-admin   # non-interactive
  */
-import bcrypt from 'bcryptjs';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { db } from '../db.js';
 import { newId } from '../lib/ids.js';
+import { hashPassword } from '../lib/password.js';
 
 async function promptHidden(question: string): Promise<string> {
   // Minimal hidden input: mute echo while reading one line.
@@ -50,7 +50,7 @@ async function main() {
   }
   if (password.length < 10) throw new Error('Passwort muss mindestens 10 Zeichen haben');
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await hashPassword(password);
   const action = await db.leiter.update((items) => {
     const existing = items.find((l) => l.email === email);
     if (existing) {

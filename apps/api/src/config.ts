@@ -23,9 +23,6 @@ export const config = {
   jwtSecret: jwtSecret || 'dev-insecure-secret-change-me',
   leiterTokenTtl: process.env.LEITER_TOKEN_TTL ?? '7d',
   teilnehmerTokenTtl: process.env.TEILNEHMER_TOKEN_TTL ?? '90d',
-  magicLinkTtlMinutes: num('MAGIC_LINK_TTL_MINUTES', 30),
-  /** Public base URL of the web app, used to build magic links and invite links. */
-  publicUrl: (process.env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
   /** Comma separated list of allowed CORS origins. Empty = same-origin only (no CORS headers). */
   corsOrigins: (process.env.CORS_ORIGIN ?? '')
     .split(',')
