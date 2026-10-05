@@ -261,7 +261,7 @@ export function ErgebnisSpeichern({ station, truppId, lauf }: { station: Station
           <div className="alert-body">
             <strong>Gespeichert</strong> für {trupp?.name ?? 'den Trupp'}: {formatStoppuhr(gespeichert.zeitSekunden)} ·{' '}
             {gespeichert.fehlerpunkte} Fehlerpunkte · {gespeichert.bestanden ? 'bestanden' : 'nicht bestanden'}.{' '}
-            <Link to="/rangliste">Zur Rangliste</Link>
+            <Link to={`/rangliste?station=${station.id}`}>Zur Rangliste</Link>
           </div>
         </div>
       ) : (
