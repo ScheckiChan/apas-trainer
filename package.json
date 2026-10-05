@@ -1,0 +1,26 @@
+{
+  "name": "apas-trainer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "APAS-Trainer — PWA zur FF-übergreifenden Vorbereitung auf die Ausbildungsprüfung Atemschutz (Bronze)",
+  "workspaces": [
+    "packages/shared",
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "postinstall": "npm run build -w @apas/shared",
+    "dev": "npm run build -w @apas/shared && node scripts/dev.mjs",
+    "dev:api": "npm run dev -w @apas/api",
+    "dev:web": "npm run dev -w @apas/web",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run build -w @apas/shared && npm run typecheck --workspaces",
+    "start": "npm run start -w @apas/api",
+    "seed-admin": "npm run seed-admin -w @apas/api",
+    "generate-vapid": "npm run generate-vapid -w @apas/api",
+    "generate-icons": "node scripts/generate-icons.mjs"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
