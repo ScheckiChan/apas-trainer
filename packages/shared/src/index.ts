@@ -187,6 +187,18 @@ export interface JoinRequest {
   password: string;
 }
 
+/** Ausbildungsleiter adds a Teilnehmer directly (POST /gruppen/:id/teilnehmer). */
+export interface TeilnehmerCreateRequest {
+  name: string;
+  ff: string;
+}
+
+export interface TeilnehmerCreateResponse {
+  teilnehmer: Teilnehmer;
+  /** Generated password in plaintext — returned exactly once, never stored or retrievable again. */
+  tempPassword: string;
+}
+
 export interface TeilnehmerLoginRequest {
   name: string;
   password: string;

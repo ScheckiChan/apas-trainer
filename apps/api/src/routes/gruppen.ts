@@ -1,10 +1,12 @@
-import { checklistAmpel, type GruppeSummary } from '@apas/shared';
+import { checklistAmpel, type GruppeSummary, type TeilnehmerCreateResponse } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { db, type GruppeRecord, type RessourceRecord } from '../db.js';
 import { isOwner, loadGruppeForPrincipal, requireAny, requireLeiter } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId, randomToken } from '../lib/ids.js';
+import { generateTempPassword, hashPassword } from '../lib/password.js';
+import { ffSchema, findByName, nameSchema, newTeilnehmerRecord } from '../lib/teilnehmer.js';
 import { removeSubscriptionsOf } from '../push.js';
 import { toGruppe, toRessource, toTeilnehmer } from '../serialize.js';
 
@@ -84,6 +86,36 @@ gruppenRouter.get('/:gruppeId/teilnehmer', requireAny, async (req, res) => {
   const list = await db.teilnehmer.find((t) => t.gruppeId === g.id);
   list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
   res.json(list.map(toTeilnehmer));
+});
+
+const addTeilnehmerSchema = z.object({ name: nameSchema, ff: ffSchema });
+
+/**
+ * Direct add by the owning Ausbildungsleiter (e.g. to pre-populate a Trupp). Creates the
+ * Teilnehmer exactly like a self-join, but with a generated password that is returned in
+ * plaintext once — the person then logs in via the invite link with name + this password.
+ */
+gruppenRouter.post('/:gruppeId/teilnehmer', requireLeiter, async (req, res) => {
+  const g = await loadGruppeForPrincipal(req);
+  const input = parseBody(addTeilnehmerSchema, req);
+  const tempPassword = generateTempPassword();
+  const passwordHash = await hashPassword(tempPassword);
+
+  const teilnehmer = await db.teilnehmer.update((items) => {
+    const existing = findByName(items, g.id, input.name);
+    if (existing) {
+      throw new HttpError(
+        409,
+        `Der Name „${existing.name}" ist in dieser Gruppe schon vergeben. ` +
+          'Unterscheide die Person z. B. mit dem Anfangsbuchstaben des Nachnamens.',
+      );
+    }
+    const rec = newTeilnehmerRecord(g.id, { name: input.name, ff: input.ff, passwordHash });
+    return { items: [...items, rec], result: rec };
+  });
+
+  const body: TeilnehmerCreateResponse = { teilnehmer: toTeilnehmer(teilnehmer), tempPassword };
+  res.status(201).json(body);
 });
 
 const checkStatus = z.enum(['ok', 'offen']);

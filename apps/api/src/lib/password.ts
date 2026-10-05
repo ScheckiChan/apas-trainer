@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { randomInt } from 'node:crypto';
 
 /** Same cost for Ausbildungsleiter and Teilnehmer passwords. */
 const BCRYPT_COST = 12;
@@ -12,4 +13,14 @@ const DUMMY_HASH = bcrypt.hashSync('timing-dummy-password', BCRYPT_COST);
 export async function verifyPassword(password: string, hash: string | undefined): Promise<boolean> {
   const ok = await bcrypt.compare(password, hash ?? DUMMY_HASH);
   return ok && hash !== undefined;
+}
+
+// No 0/O/o, 1/l/I — the temp password is read off a phone screen and typed in by hand.
+const TEMP_ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+/** Readable random password for Teilnehmer added by the Ausbildungsleiter (11 chars ≈ 64 bit). */
+export function generateTempPassword(length = 11): string {
+  let out = '';
+  for (let i = 0; i < length; i++) out += TEMP_ALPHABET[randomInt(TEMP_ALPHABET.length)];
+  return out;
 }

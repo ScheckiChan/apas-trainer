@@ -1,11 +1,11 @@
-import { EMPTY_CHECKLISTE, type JoinInfo, type TeilnehmerSession } from '@apas/shared';
+import type { JoinInfo, TeilnehmerSession } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { db, type GruppeRecord, type TeilnehmerRecord } from '../db.js';
 import { signTeilnehmerToken } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
-import { newId } from '../lib/ids.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
+import { ffSchema, findByName, nameSchema, newTeilnehmerRecord } from '../lib/teilnehmer.js';
 import { toGruppe, toTeilnehmer } from '../serialize.js';
 
 /**
@@ -23,16 +23,6 @@ async function gruppeByInvite(token: string): Promise<GruppeRecord> {
   return g;
 }
 
-/** Identity within a Gruppe is the name — compared trimmed, whitespace-collapsed, case-insensitive. */
-const nameKey = (name: string): string => name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('de');
-
-const nameSchema = z
-  .string()
-  .trim()
-  .min(2)
-  .max(100)
-  .transform((n) => n.replace(/\s+/g, ' '));
-
 function session(t: TeilnehmerRecord, g: GruppeRecord): TeilnehmerSession {
   return {
     token: signTeilnehmerToken({ sub: t.id, gruppeId: t.gruppeId }),
@@ -49,7 +39,7 @@ joinRouter.get('/:token/join', async (req, res) => {
 
 const joinSchema = z.object({
   name: nameSchema,
-  ff: z.string().trim().min(2).max(100),
+  ff: ffSchema,
   // bcrypt only uses the first 72 bytes — cap it instead of silently truncating.
   password: z.string().min(8, 'Passwort muss mindestens 8 Zeichen haben').max(72),
 });
@@ -59,10 +49,9 @@ joinRouter.post('/:token/join', async (req, res) => {
   const input = parseBody(joinSchema, req);
   // Hash outside the collection lock — bcrypt is deliberately slow.
   const passwordHash = await hashPassword(input.password);
-  const key = nameKey(input.name);
 
   const teilnehmer = await db.teilnehmer.update((items) => {
-    const existing = items.find((t) => t.gruppeId === gruppe.id && nameKey(t.name) === key);
+    const existing = findByName(items, gruppe.id, input.name);
     if (existing?.passwordHash) {
       throw new HttpError(
         409,
@@ -79,16 +68,7 @@ joinRouter.post('/:token/join', async (req, res) => {
       const claimed: TeilnehmerRecord = { ...rest, name: input.name, ff: input.ff, passwordHash };
       return { items: items.map((t) => (t.id === existing.id ? claimed : t)), result: claimed };
     }
-    const rec: TeilnehmerRecord = {
-      id: newId(),
-      gruppeId: gruppe.id,
-      name: input.name,
-      ff: input.ff,
-      rolle: null,
-      passwordHash,
-      joinedAt: new Date().toISOString(),
-      checkliste: { ...EMPTY_CHECKLISTE },
-    };
+    const rec = newTeilnehmerRecord(gruppe.id, { name: input.name, ff: input.ff, passwordHash });
     return { items: [...items, rec], result: rec };
   });
 
@@ -103,8 +83,7 @@ const loginSchema = z.object({
 joinRouter.post('/:token/login', async (req, res) => {
   const gruppe = await gruppeByInvite(String(req.params.token));
   const input = parseBody(loginSchema, req);
-  const key = nameKey(input.name);
-  const t = await db.teilnehmer.findOne((x) => x.gruppeId === gruppe.id && nameKey(x.name) === key);
+  const t = findByName(await db.teilnehmer.all(), gruppe.id, input.name);
 
   if (t && !t.passwordHash) {
     throw new HttpError(
