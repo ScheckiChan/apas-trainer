@@ -1,0 +1,79 @@
+.tv-hero {
+  background: linear-gradient(135deg, var(--dark) 0%, var(--dark-2) 60%, var(--red-dark) 100%);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tv-hero h1 {
+  font-size: 1.4rem;
+  margin: 0.15rem 0;
+}
+
+.tv-hello {
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.tv-meta {
+  opacity: 0.85;
+  font-size: 0.9rem;
+}
+
+.tv-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.tv-countdown strong {
+  font-size: 1.35rem;
+  color: #ffcdd2;
+}
+
+.tv-countdown span {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.tv-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 0.25rem;
+  box-shadow: var(--shadow);
+}
+
+.tv-tab {
+  flex: 1;
+  font: inherit;
+  font-weight: 600;
+  border: 0;
+  background: transparent;
+  padding: 0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--grey);
+}
+
+.tv-tab-active {
+  background: var(--red);
+  color: #fff;
+}
+
+.tv-check-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tv-check-head h2 {
+  margin: 0;
+}

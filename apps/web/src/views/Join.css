@@ -1,0 +1,46 @@
+.join {
+  min-height: 100vh;
+  background: var(--dark);
+  padding: 2rem 1rem;
+}
+
+.join-inner {
+  max-width: 460px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.join-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  color: #fff;
+}
+
+.join-head img {
+  border-radius: 12px;
+}
+
+.join-head h1 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.join-head p {
+  margin: 0.2rem 0 0;
+  opacity: 0.85;
+}
+
+.join .btn {
+  width: 100%;
+}
+
+.join-sent {
+  text-align: center;
+}
+
+.join-sent-icon {
+  font-size: 2.5rem;
+}

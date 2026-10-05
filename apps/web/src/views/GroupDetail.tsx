@@ -1,0 +1,317 @@
+import {
+  ROLLE_LABELS,
+  ROLLE_SHORT,
+  checklistAmpel,
+  type ChecklistItem,
+  type Gruppe,
+  type Ressource,
+  type Teilnehmer,
+} from '@apas/shared';
+import QRCode from 'qrcode';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { AppHeader } from '../components/AppHeader';
+import { AmpelDot, ChecklistToggles } from '../components/Checklist';
+import { api, errorMessage } from '../lib/api';
+import { countdownLabel } from '../lib/format';
+import './GroupDetail.css';
+
+export function GroupDetail() {
+  const { gruppeId } = useParams();
+  const [gruppe, setGruppe] = useState<Gruppe | null>(null);
+  const [teilnehmer, setTeilnehmer] = useState<Teilnehmer[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [g, t] = await Promise.all([
+        api<Gruppe>(`/gruppen/${gruppeId}`, { auth: 'leiter' }),
+        api<Teilnehmer[]>(`/gruppen/${gruppeId}/teilnehmer`, { auth: 'leiter' }),
+      ]);
+      setGruppe(g);
+      setTeilnehmer(t);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }, [gruppeId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const toggle = async (t: Teilnehmer, item: ChecklistItem) => {
+    const next = t.checkliste[item] === 'ok' ? 'offen' : 'ok';
+    try {
+      const updated = await api<Teilnehmer>(`/gruppen/${gruppeId}/teilnehmer/${t.id}/checkliste`, {
+        method: 'PATCH',
+        auth: 'leiter',
+        body: { [item]: next },
+      });
+      setTeilnehmer((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err) {
+      alert(errorMessage(err));
+    }
+  };
+
+  const remove = async (t: Teilnehmer) => {
+    if (!confirm(`${t.name} aus der Gruppe entfernen?`)) return;
+    try {
+      await api(`/gruppen/${gruppeId}/teilnehmer/${t.id}`, { method: 'DELETE', auth: 'leiter' });
+      setTeilnehmer((list) => list.filter((x) => x.id !== t.id));
+    } catch (err) {
+      alert(errorMessage(err));
+    }
+  };
+
+  if (error) {
+    return (
+      <>
+        <AppHeader backTo="/gruppen" />
+        <main className="page">
+          <div className="alert alert-error">{error}</div>
+        </main>
+      </>
+    );
+  }
+  if (!gruppe) {
+    return (
+      <>
+        <AppHeader backTo="/gruppen" />
+        <main className="page muted">Lade…</main>
+      </>
+    );
+  }
+
+  const bereit = teilnehmer.filter((t) => checklistAmpel(t.rolle, t.checkliste) === 'gruen').length;
+
+  return (
+    <>
+      <AppHeader backTo="/gruppen" />
+      <main className="page stack">
+        <div className="gd-head">
+          <div>
+            <h1>{gruppe.name}</h1>
+            <span className="badge">{countdownLabel(gruppe.pruefungstermin)}</span>
+          </div>
+          <div className="btn-row">
+            <Link className="btn" to={`/gruppen/${gruppe.id}/kalender`}>
+              📅 Kalender
+            </Link>
+            <Link className="btn btn-secondary" to={`/gruppen/${gruppe.id}/stationen`}>
+              Stationen
+            </Link>
+          </div>
+        </div>
+
+        <div className="gd-grid">
+          <PruefungsterminEditor gruppe={gruppe} onSaved={setGruppe} />
+          <InvitePanel gruppe={gruppe} onRegenerated={setGruppe} />
+        </div>
+
+        <section className="card">
+          <div className="gd-section-head">
+            <h2>Teilnehmer ({teilnehmer.length})</h2>
+            <span className="muted">
+              <span className="ampel ampel-gruen" /> {bereit} von {teilnehmer.length} bereit
+            </span>
+          </div>
+          {teilnehmer.length === 0 ? (
+            <p className="muted">Noch niemand beigetreten. Teile den Einladungslink oder QR-Code.</p>
+          ) : (
+            <ul className="gd-tn-list">
+              {teilnehmer.map((t) => (
+                <li key={t.id} className="gd-tn">
+                  <AmpelDot teilnehmer={t} />
+                  <div className="gd-tn-main">
+                    <div className="gd-tn-name">
+                      {t.name}
+                      {!t.emailVerified && (
+                        <span className="badge" title="Magic Link noch nicht bestätigt">
+                          unbestätigt
+                        </span>
+                      )}
+                    </div>
+                    <div className="muted">
+                      {t.ff} · <span title={ROLLE_LABELS[t.rolle]}>{ROLLE_SHORT[t.rolle]}</span>
+                      {t.email && <> · {t.email}</>}
+                    </div>
+                  </div>
+                  <ChecklistToggles teilnehmer={t} compact onToggle={(item) => toggle(t, item)} />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-small gd-remove"
+                    onClick={() => remove(t)}
+                    title="Aus Gruppe entfernen"
+                    aria-label={`${t.name} entfernen`}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <RessourcenPanel gruppeId={gruppe.id} />
+      </main>
+    </>
+  );
+}
+
+function PruefungsterminEditor({ gruppe, onSaved }: { gruppe: Gruppe; onSaved: (g: Gruppe) => void }) {
+  const [value, setValue] = useState(gruppe.pruefungstermin ?? '');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const dirty = value !== (gruppe.pruefungstermin ?? '');
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setMsg(null);
+    try {
+      const g = await api<Gruppe>(`/gruppen/${gruppe.id}`, {
+        method: 'PATCH',
+        auth: 'leiter',
+        body: { pruefungstermin: value || null },
+      });
+      onSaved(g);
+      setMsg('Gespeichert');
+    } catch (err) {
+      setMsg(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="card stack" onSubmit={save}>
+      <h2>Prüfungstermin</h2>
+      <input type="date" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Prüfungstermin" />
+      <div className="btn-row">
+        <button className="btn" type="submit" disabled={busy || !dirty}>
+          Speichern
+        </button>
+        {msg && <span className="muted">{msg}</span>}
+      </div>
+    </form>
+  );
+}
+
+function InvitePanel({ gruppe, onRegenerated }: { gruppe: Gruppe; onRegenerated: (g: Gruppe) => void }) {
+  const link = `${window.location.origin}/join/${gruppe.inviteToken ?? ''}`;
+  const [qr, setQr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    QRCode.toDataURL(link, { width: 220, margin: 1, color: { dark: '#1d1f24', light: '#ffffff' } })
+      .then(setQr)
+      .catch(() => setQr(null));
+  }, [link]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      prompt('Link kopieren:', link);
+    }
+  };
+
+  const regenerate = async () => {
+    if (!confirm('Neuen Einladungslink erzeugen? Der bisherige Link funktioniert danach nicht mehr.')) return;
+    try {
+      onRegenerated(await api<Gruppe>(`/gruppen/${gruppe.id}/invite/regenerate`, { method: 'POST', auth: 'leiter' }));
+    } catch (err) {
+      alert(errorMessage(err));
+    }
+  };
+
+  return (
+    <section className="card gd-invite">
+      <div className="stack">
+        <h2>Einladungslink</h2>
+        <input readOnly value={link} onFocus={(e) => e.target.select()} aria-label="Einladungslink" />
+        <div className="btn-row">
+          <button type="button" className="btn btn-secondary btn-small" onClick={copy}>
+            {copied ? '✓ Kopiert' : 'Kopieren'}
+          </button>
+          <button type="button" className="btn btn-ghost btn-small" onClick={regenerate}>
+            Neu erzeugen
+          </button>
+        </div>
+      </div>
+      {qr && <img className="gd-qr" src={qr} alt="QR-Code zum Einladungslink" width={150} height={150} />}
+    </section>
+  );
+}
+
+function RessourcenPanel({ gruppeId }: { gruppeId: string }) {
+  const [list, setList] = useState<Ressource[]>([]);
+  const [name, setName] = useState('');
+  const [standort, setStandort] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<Ressource[]>(`/gruppen/${gruppeId}/ressourcen`, { auth: 'leiter' })
+      .then(setList)
+      .catch((err) => setError(errorMessage(err)));
+  }, [gruppeId]);
+
+  const add = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      const r = await api<Ressource>(`/gruppen/${gruppeId}/ressourcen`, {
+        method: 'POST',
+        auth: 'leiter',
+        body: { name, standort },
+      });
+      setList((l) => [...l, r].sort((a, b) => a.name.localeCompare(b.name, 'de')));
+      setName('');
+      setStandort('');
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  const remove = async (r: Ressource) => {
+    if (!confirm(`Ressource „${r.name}" löschen? Bestehende Termine verlieren die Buchung.`)) return;
+    try {
+      await api(`/gruppen/${gruppeId}/ressourcen/${r.id}`, { method: 'DELETE', auth: 'leiter' });
+      setList((l) => l.filter((x) => x.id !== r.id));
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  return (
+    <section className="card stack">
+      <h2>Ressourcen</h2>
+      <p className="muted">Fahrzeuge, Übungsgelände oder Geräte, die bei Terminen gebucht werden können.</p>
+      {error && <div className="alert alert-error">{error}</div>}
+      {list.length > 0 && (
+        <ul className="gd-res-list">
+          {list.map((r) => (
+            <li key={r.id}>
+              <div>
+                <strong>{r.name}</strong>
+                {r.standort && <span className="muted"> · {r.standort}</span>}
+              </div>
+              <button type="button" className="btn btn-ghost btn-small" onClick={() => remove(r)} aria-label="Löschen">
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form className="gd-res-form" onSubmit={add}>
+        <input required placeholder="Name, z. B. HLF Fels" value={name} onChange={(e) => setName(e.target.value)} />
+        <input placeholder="Standort" value={standort} onChange={(e) => setStandort(e.target.value)} />
+        <button className="btn btn-secondary" type="submit">
+          Hinzufügen
+        </button>
+      </form>
+    </section>
+  );
+}

@@ -1,0 +1,221 @@
+/* Global base styles + design tokens. View-specific styles live next to each view. */
+:root {
+  --red: #b71c1c;
+  --red-dark: #8e1414;
+  --red-soft: #fdecea;
+  --dark: #1d1f24;
+  --dark-2: #2a2d34;
+  --grey: #6b7280;
+  --grey-light: #e5e7eb;
+  --bg: #f4f4f5;
+  --surface: #ffffff;
+  --text: #1d1f24;
+  --green: #2e7d32;
+  --yellow: #f9a825;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+}
+
+a {
+  color: var(--red);
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.stack > * + * {
+  margin-top: 1rem;
+}
+
+.muted {
+  color: var(--grey);
+  font-size: 0.9rem;
+}
+
+/* ---------- Forms & buttons ---------- */
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #cfd2d8;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--red);
+  outline-offset: 0;
+  border-color: transparent;
+}
+
+input[type='checkbox'] {
+  width: auto;
+}
+
+.field + .field {
+  margin-top: 0.75rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  background: var(--red);
+  color: #fff;
+}
+
+.btn:hover {
+  background: var(--red-dark);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: var(--dark);
+  border-color: #cfd2d8;
+}
+
+.btn-secondary:hover {
+  background: var(--grey-light);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: inherit;
+  border-color: transparent;
+}
+
+.btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.btn-small {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ---------- Messages ---------- */
+
+.alert {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+}
+
+.alert-error {
+  background: var(--red-soft);
+  color: var(--red-dark);
+  border: 1px solid #f5c2bd;
+}
+
+.alert-warn {
+  background: #fff8e1;
+  color: #6d4c00;
+  border: 1px solid #ffe082;
+}
+
+.alert-ok {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border: 1px solid #a5d6a7;
+}
+
+/* ---------- Ampel ---------- */
+
+.ampel {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ampel-gruen {
+  background: var(--green);
+}
+
+.ampel-gelb {
+  background: var(--yellow);
+}
+
+.ampel-rot {
+  background: var(--red);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--grey-light);
+  color: var(--dark);
+}
+
+.badge-red {
+  background: var(--red);
+  color: #fff;
+}

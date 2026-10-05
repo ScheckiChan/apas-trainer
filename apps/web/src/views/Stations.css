@@ -1,0 +1,55 @@
+.stations h1 {
+  font-size: 1.4rem;
+}
+
+.stations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.station-card {
+  border-top: 4px solid var(--red);
+}
+
+.station-card h2 {
+  font-size: 1.1rem;
+}
+
+.station-card p {
+  margin: 0 0 0.5rem;
+}
+
+.station-card ul,
+.stations-rules ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.station-card li {
+  font-size: 0.92rem;
+}
+
+.station-nr {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--red);
+  margin-bottom: 0.2rem;
+}
+
+.stations-rules {
+  background: var(--dark);
+  color: #fff;
+}
+
+.stations-rules li + li {
+  margin-top: 0.3rem;
+}
+
+.stations-source {
+  font-size: 0.8rem;
+  color: var(--grey);
+  margin: 1.5rem 0 0;
+}

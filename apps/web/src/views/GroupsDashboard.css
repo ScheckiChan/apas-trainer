@@ -1,0 +1,85 @@
+.dashboard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: inherit;
+  text-decoration: none;
+  border-left: 4px solid var(--red);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.dashboard-card-top h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.dashboard-card-top .badge {
+  white-space: nowrap;
+}
+
+.dashboard-card-stats {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.92rem;
+}
+
+.dashboard-card-stats > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.dashboard-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--grey-light);
+  overflow: hidden;
+}
+
+.dashboard-progress > div {
+  height: 100%;
+  background: var(--green);
+}
+
+.dashboard-create-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 600px) {
+  .dashboard-create-fields {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "APAS-Trainer",
+  "short_name": "APAS",
+  "description": "FF-übergreifende Vorbereitung auf die Ausbildungsprüfung Atemschutz (Bronze)",
+  "lang": "de-AT",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1d1f24",
+  "theme_color": "#b71c1c",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
