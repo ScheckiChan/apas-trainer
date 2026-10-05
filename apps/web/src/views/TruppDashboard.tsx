@@ -34,6 +34,10 @@ export function TruppDashboard() {
   return (
     <>
       <AppHeader>
+        <Link to="/kalender" className="btn btn-ghost btn-small" title="Kalender">
+          <Icon name="calendar-days" />
+          <span className="hide-sm">Kalender</span>
+        </Link>
         <Link to="/rangliste" className="btn btn-ghost btn-small" title="Rangliste">
           <Icon name="trophy" />
           <span className="hide-sm">Rangliste</span>

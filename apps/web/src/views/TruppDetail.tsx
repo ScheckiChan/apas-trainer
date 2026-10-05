@@ -3,7 +3,6 @@ import {
   type ChecklistItem,
   type Trupp,
   type Rolle,
-  type Ressource,
   type Teilnehmer,
   type TeilnehmerCreateResponse,
 } from '@apas/shared';
@@ -115,7 +114,7 @@ export function TruppDetail() {
             </p>
           </div>
           <div className="btn-row">
-            <Link className="btn" to={`/trupps/${trupp.id}/kalender`}>
+            <Link className="btn" to="/kalender" title="Gemeinsamer Kalender aller Trupps">
               <Icon name="calendar-days" />
               Kalender
             </Link>
@@ -181,8 +180,6 @@ export function TruppDetail() {
           <PruefungsterminEditor trupp={trupp} onSaved={setTrupp} />
           <InvitePanel trupp={trupp} onRegenerated={setTrupp} />
         </div>
-
-        <RessourcenPanel truppId={trupp.id} />
       </main>
     </>
   );
@@ -410,94 +407,6 @@ function InvitePanel({ trupp, onRegenerated }: { trupp: Trupp; onRegenerated: (t
         </div>
       </div>
       {qr && <img className="gd-qr" src={qr} alt="QR-Code zum Einladungslink" width={150} height={150} />}
-    </section>
-  );
-}
-
-function RessourcenPanel({ truppId }: { truppId: string }) {
-  const [list, setList] = useState<Ressource[]>([]);
-  const [name, setName] = useState('');
-  const [standort, setStandort] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api<Ressource[]>(`/trupps/${truppId}/ressourcen`, { auth: 'leiter' })
-      .then(setList)
-      .catch((err) => setError(errorMessage(err)));
-  }, [truppId]);
-
-  const add = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    try {
-      const r = await api<Ressource>(`/trupps/${truppId}/ressourcen`, {
-        method: 'POST',
-        auth: 'leiter',
-        body: { name, standort },
-      });
-      setList((l) => [...l, r].sort((a, b) => a.name.localeCompare(b.name, 'de')));
-      setName('');
-      setStandort('');
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  };
-
-  const remove = async (r: Ressource) => {
-    if (!confirm(`Ressource „${r.name}" löschen? Bestehende Termine verlieren die Buchung.`)) return;
-    try {
-      await api(`/trupps/${truppId}/ressourcen/${r.id}`, { method: 'DELETE', auth: 'leiter' });
-      setList((l) => l.filter((x) => x.id !== r.id));
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  };
-
-  return (
-    <section className="card stack">
-      <h2>Ressourcen</h2>
-      <p className="muted">Fahrzeuge, Übungsgelände oder Geräte, die bei Terminen gebucht werden können.</p>
-      {error && (
-        <div className="alert alert-error">
-          <Icon name="triangle-alert" />
-          <div className="alert-body">{error}</div>
-        </div>
-      )}
-      {list.length > 0 && (
-        <ul className="gd-res-list">
-          {list.map((r) => (
-            <li key={r.id}>
-              <div>
-                <strong>{r.name}</strong>
-                {r.standort && <span className="muted"> · {r.standort}</span>}
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon gd-remove"
-                onClick={() => remove(r)}
-                aria-label={`${r.name} löschen`}
-                title="Ressource löschen"
-              >
-                <Icon name="trash-2" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form className="gd-res-form" onSubmit={add}>
-        <input
-          required
-          placeholder="Name, z. B. HLF Fels"
-          aria-label="Name der Ressource"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input placeholder="Standort" aria-label="Standort" value={standort} onChange={(e) => setStandort(e.target.value)} />
-        <button className="btn btn-secondary" type="submit">
-          <Icon name="plus" />
-          Hinzufügen
-        </button>
-      </form>
     </section>
   );
 }

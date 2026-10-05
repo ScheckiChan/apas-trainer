@@ -2,7 +2,7 @@ import { useEffect, type ReactElement } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { AppHeader } from './components/AppHeader';
 import { getToken } from './lib/api';
-import { Calendar } from './views/Calendar';
+import { KalenderPage } from './views/Calendar';
 import { TruppDetail } from './views/TruppDetail';
 import { TruppDashboard } from './views/TruppDashboard';
 import { Join } from './views/Join';
@@ -20,7 +20,7 @@ function RequireTeilnehmer({ children }: { children: ReactElement }) {
   return getToken('teilnehmer') ? children : <Navigate to="/login?teilnehmer=1" replace />;
 }
 
-/** Either session will do (Rangliste is visible to everyone signed in). */
+/** Either session will do (Rangliste and Kalender are shared by everyone signed in). */
 function RequireAny({ children }: { children: ReactElement }) {
   return getToken('leiter') || getToken('teilnehmer') ? children : <Navigate to="/login" replace />;
 }
@@ -29,18 +29,6 @@ function Home() {
   if (getToken('leiter')) return <Navigate to="/trupps" replace />;
   if (getToken('teilnehmer')) return <Navigate to="/teilnehmer" replace />;
   return <Navigate to="/login" replace />;
-}
-
-function LeiterCalendarPage() {
-  const { truppId } = useParams();
-  return (
-    <>
-      <AppHeader backTo={`/trupps/${truppId}`} />
-      <main className="page">
-        <Calendar truppId={truppId!} auth="leiter" />
-      </main>
-    </>
-  );
 }
 
 /** Where the station overview lives for the current URL, and where its back arrow goes. */
@@ -98,10 +86,11 @@ export function App() {
       <Route path="/stationen" element={<StationsPage />} />
       <Route path="/stationen/:stationId" element={<StationDetailPage />} />
       <Route path="/rangliste" element={<RequireAny><Rangliste /></RequireAny>} />
+      <Route path="/kalender" element={<RequireAny><KalenderPage /></RequireAny>} />
 
       <Route path="/trupps" element={<RequireLeiter><TruppDashboard /></RequireLeiter>} />
       <Route path="/trupps/:truppId" element={<RequireLeiter><TruppDetail /></RequireLeiter>} />
-      <Route path="/trupps/:truppId/kalender" element={<RequireLeiter><LeiterCalendarPage /></RequireLeiter>} />
+      <Route path="/trupps/:truppId/kalender" element={<Navigate to="/kalender" replace />} />
       <Route path="/trupps/:truppId/stationen" element={<RequireLeiter><StationsPage /></RequireLeiter>} />
       <Route path="/trupps/:truppId/stationen/:stationId" element={<RequireLeiter><StationDetailPage /></RequireLeiter>} />
 

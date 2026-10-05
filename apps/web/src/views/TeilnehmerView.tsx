@@ -8,7 +8,7 @@ import {
   type Teilnehmer,
 } from '@apas/shared';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
 import { Icon } from '../components/Icon';
@@ -16,11 +16,10 @@ import { PushButton } from '../components/PushButton';
 import { RolleSelect, RollenAbdeckung, rolleLabel, saveRolle } from '../components/Rollen';
 import { api, clearToken, errorMessage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
-import { Calendar } from './Calendar';
 import { Stations } from './Stations';
 import './TeilnehmerView.css';
 
-const TABS = ['checkliste', 'trupp', 'kalender', 'stationen'] as const;
+const TABS = ['checkliste', 'trupp', 'stationen'] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (v: string | null): v is Tab => TABS.includes(v as Tab);
 
@@ -81,9 +80,16 @@ export function TeilnehmerView() {
     navigate('/login?teilnehmer=1', { replace: true });
   };
 
+  // The calendar used to be a tab here; it is now the shared /kalender of all Trupps.
+  if (tabParam === 'kalender') return <Navigate to="/kalender" replace />;
+
   return (
     <>
       <AppHeader>
+        <Link to="/kalender" className="btn btn-ghost btn-small" title="Kalender">
+          <Icon name="calendar-days" />
+          <span className="hide-sm">Kalender</span>
+        </Link>
         <Link to="/rangliste" className="btn btn-ghost btn-small" title="Rangliste">
           <Icon name="trophy" />
           <span className="hide-sm">Rangliste</span>
@@ -125,7 +131,6 @@ export function TeilnehmerView() {
                 [
                   ['checkliste', 'Checkliste'],
                   ['trupp', 'Trupp'],
-                  ['kalender', 'Kalender'],
                   ['stationen', 'Stationen'],
                 ] as const
               ).map(([key, label]) => (
@@ -170,8 +175,6 @@ export function TeilnehmerView() {
             )}
 
             {tab === 'trupp' && <TruppTab me={me} onRolleChange={changeRolle} />}
-
-            {tab === 'kalender' && <Calendar truppId={trupp.id} auth="teilnehmer" currentTeilnehmerId={me.id} />}
 
             {tab === 'stationen' && <Stations basePath="/teilnehmer/stationen" />}
           </>

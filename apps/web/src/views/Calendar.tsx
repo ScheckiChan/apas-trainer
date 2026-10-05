@@ -1,5 +1,6 @@
 import {
   type BuchungsKonflikt,
+  type KalenderPerson,
   type Ressource,
   type Teilnehmer,
   type Termin,
@@ -8,16 +9,16 @@ import {
   type TerminTyp,
 } from '@apas/shared';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { AppHeader } from '../components/AppHeader';
 import { Icon } from '../components/Icon';
 import { rolleShort } from '../components/Rollen';
-import { api, errorMessage } from '../lib/api';
+import { api, errorMessage, getToken } from '../lib/api';
 import { formatDateTime, formatTime, localToIso, toLocalDateKey, toLocalTime } from '../lib/format';
 import './Calendar.css';
 
 type Auth = 'leiter' | 'teilnehmer';
 
 interface CalendarProps {
-  truppId: string;
   auth: Auth;
   /** Set when a Teilnehmer is viewing — used for permissions and defaults. */
   currentTeilnehmerId?: string;
@@ -41,6 +42,56 @@ function TypIcon({ typ }: { typ: TerminTyp }) {
 }
 const monthFmt = new Intl.DateTimeFormat('de-AT', { month: 'long', year: 'numeric' });
 
+/** Personen grouped by Trupp, in the server's order (Trupp name, then name). */
+function byTrupp(personen: KalenderPerson[]): { truppId: string; truppName: string; personen: KalenderPerson[] }[] {
+  const groups = new Map<string, { truppId: string; truppName: string; personen: KalenderPerson[] }>();
+  for (const p of personen) {
+    let g = groups.get(p.truppId);
+    if (!g) groups.set(p.truppId, (g = { truppId: p.truppId, truppName: p.truppName, personen: [] }));
+    g.personen.push(p);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * /kalender — the one shared calendar of this Ausbildung, for the Ausbildungsleiter and the
+ * Teilnehmer of every Trupp. The Leiter session wins if both are present (like the Rangliste).
+ */
+export function KalenderPage() {
+  const auth: Auth = getToken('leiter') ? 'leiter' : 'teilnehmer';
+  const [meId, setMeId] = useState<string | undefined>();
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (auth !== 'teilnehmer') return;
+    api<{ teilnehmer: Teilnehmer }>('/auth/teilnehmer/me', { auth })
+      .then((r) => setMeId(r.teilnehmer.id))
+      .catch((err) => setError(errorMessage(err)));
+  }, [auth]);
+
+  return (
+    <>
+      <AppHeader backTo="/" />
+      <main className="page stack">
+        <div>
+          <h1>Kalender</h1>
+          <p className="muted">Ein gemeinsamer Kalender für alle Trupps dieser Ausbildung.</p>
+        </div>
+        {error ? (
+          <div className="alert alert-error">
+            <Icon name="triangle-alert" />
+            <div className="alert-body">{error}</div>
+          </div>
+        ) : auth === 'teilnehmer' && !meId ? (
+          <p className="muted">Lade…</p>
+        ) : (
+          <Calendar auth={auth} currentTeilnehmerId={meId} />
+        )}
+      </main>
+    </>
+  );
+}
+
 /** 6×7 grid starting on the Monday on/before the 1st of the month. */
 function buildGrid(month: Date): Date[] {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -49,13 +100,13 @@ function buildGrid(month: Date): Date[] {
   return Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
 }
 
-export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) {
+export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [termine, setTermine] = useState<Termin[]>([]);
-  const [teilnehmer, setTeilnehmer] = useState<Teilnehmer[]>([]);
+  const [personen, setPersonen] = useState<KalenderPerson[]>([]);
   const [ressourcen, setRessourcen] = useState<Ressource[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editor, setEditor] = useState<EditorState>(null);
@@ -69,14 +120,14 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
     try {
       setTermine(
         await api<Termin[]>(
-          `/trupps/${truppId}/termine?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
+          `/termine?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
           { auth },
         ),
       );
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, [grid, truppId, auth]);
+  }, [grid, auth]);
 
   useEffect(() => {
     void loadTermine();
@@ -84,15 +135,15 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
 
   useEffect(() => {
     Promise.all([
-      api<Teilnehmer[]>(`/trupps/${truppId}/teilnehmer`, { auth }),
-      api<Ressource[]>(`/trupps/${truppId}/ressourcen`, { auth }),
+      api<KalenderPerson[]>('/termine/personen', { auth }),
+      api<Ressource[]>('/ressourcen', { auth }),
     ])
-      .then(([t, r]) => {
-        setTeilnehmer(t);
+      .then(([p, r]) => {
+        setPersonen(p);
         setRessourcen(r);
       })
       .catch((err) => setError(errorMessage(err)));
-  }, [truppId, auth]);
+  }, [auth]);
 
   const termineOn = (day: Date): Termin[] => {
     const start = day.getTime();
@@ -226,14 +277,21 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
         )}
       </section>
 
+      {auth === 'leiter' && (
+        <RessourcenPanel
+          ressourcen={ressourcen}
+          onChange={setRessourcen}
+          onRemoved={() => void loadTermine()}
+        />
+      )}
+
       {editor && (
         <TerminEditor
           key={editor.mode === 'edit' ? editor.termin.id : `${editor.typ}-${editor.date}`}
           state={editor}
-          truppId={truppId}
           auth={auth}
           currentTeilnehmerId={currentTeilnehmerId}
-          teilnehmer={teilnehmer}
+          personen={personen}
           ressourcen={ressourcen}
           onClose={() => setEditor(null)}
           onSaved={() => {
@@ -250,19 +308,17 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
 
 function TerminEditor({
   state,
-  truppId,
   auth,
   currentTeilnehmerId,
-  teilnehmer,
+  personen,
   ressourcen,
   onClose,
   onSaved,
 }: {
   state: NonNullable<EditorState>;
-  truppId: string;
   auth: Auth;
   currentTeilnehmerId?: string;
-  teilnehmer: Teilnehmer[];
+  personen: KalenderPerson[];
   ressourcen: Ressource[];
   onClose: () => void;
   onSaved: () => void;
@@ -281,7 +337,7 @@ function TerminEditor({
   const [ressourceId, setRessourceId] = useState(existing?.ressourceId ?? '');
   const [selected, setSelected] = useState<Set<string>>(() => {
     if (existing) return new Set(existing.teilnehmerIds);
-    if (typ === 'fix') return new Set(teilnehmer.map((t) => t.id));
+    if (typ === 'fix') return new Set(personen.map((t) => t.id));
     return new Set(currentTeilnehmerId ? [currentTeilnehmerId] : []);
   });
   const [konflikte, setKonflikte] = useState<BuchungsKonflikt[]>([]);
@@ -297,7 +353,7 @@ function TerminEditor({
       return;
     }
     const handle = setTimeout(() => {
-      api<BuchungsKonflikt[]>(`/trupps/${truppId}/termine/konflikte`, {
+      api<BuchungsKonflikt[]>('/termine/konflikte', {
         method: 'POST',
         auth,
         body: {
@@ -311,7 +367,7 @@ function TerminEditor({
         .catch(() => setKonflikte([]));
     }, 250);
     return () => clearTimeout(handle);
-  }, [ressourceId, date, startTime, endTime, timesValid, truppId, auth, existing?.id]);
+  }, [ressourceId, date, startTime, endTime, timesValid, auth, existing?.id]);
 
   const toggleTn = (id: string) =>
     setSelected((s) => {
@@ -320,6 +376,20 @@ function TerminEditor({
       else next.add(id);
       return next;
     });
+
+  /** Select a whole Trupp, or clear it if it is fully selected already. */
+  const toggleTrupp = (ids: string[]) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      const all = ids.every((id) => next.has(id));
+      for (const id of ids) {
+        if (all) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+
+  const gruppen = byTrupp(personen);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -339,7 +409,7 @@ function TerminEditor({
     };
     try {
       const res = await api<TerminSaveResponse>(
-        existing ? `/trupps/${truppId}/termine/${existing.id}` : `/trupps/${truppId}/termine`,
+        existing ? `/termine/${existing.id}` : '/termine',
         { method: existing ? 'PUT' : 'POST', auth, body },
       );
       if (res.konflikte.length > 0) {
@@ -357,7 +427,7 @@ function TerminEditor({
   const remove = async () => {
     if (!existing || !confirm(`Termin „${existing.titel}" löschen?`)) return;
     try {
-      await api(`/trupps/${truppId}/termine/${existing.id}`, { method: 'DELETE', auth });
+      await api(`/termine/${existing.id}`, { method: 'DELETE', auth });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -365,8 +435,11 @@ function TerminEditor({
   };
 
   const ressourceName = (id: string) => ressourcen.find((r) => r.id === id)?.name ?? 'Ressource';
-  const creatorLabel = (createdBy: string) =>
-    createdBy === 'ausbildungsleiter' ? 'Ausbildungsleiter' : (teilnehmer.find((t) => t.id === createdBy)?.name ?? '—');
+  const creatorLabel = (createdBy: string) => {
+    if (createdBy === 'ausbildungsleiter') return 'Ausbildungsleiter';
+    const p = personen.find((t) => t.id === createdBy);
+    return p ? `${p.name} (${p.truppName})` : '—';
+  };
 
   const heading = existing
     ? canEdit
@@ -457,7 +530,7 @@ function TerminEditor({
               <label>Teilnehmer ({selected.size})</label>
               {canEdit && (
                 <span className="btn-row">
-                  <button type="button" className="btn btn-ghost btn-small" onClick={() => setSelected(new Set(teilnehmer.map((t) => t.id)))}>
+                  <button type="button" className="btn btn-ghost btn-small" onClick={() => setSelected(new Set(personen.map((t) => t.id)))}>
                     Alle
                   </button>
                   <button type="button" className="btn btn-ghost btn-small" onClick={() => setSelected(new Set())}>
@@ -466,19 +539,42 @@ function TerminEditor({
                 </span>
               )}
             </div>
-            {teilnehmer.length === 0 ? (
-              <p className="muted">Noch keine Teilnehmer im Trupp.</p>
+            {personen.length === 0 ? (
+              <p className="muted">Noch keine Teilnehmer in einem Trupp.</p>
             ) : (
               <div className="cal-tn-list">
-                {teilnehmer.map((t) => (
-                  <label key={t.id} className="cal-tn">
-                    <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleTn(t.id)} />
-                    <span>{t.name}</span>
-                    <span className="muted">
-                      {rolleShort(t.rolle)} · {t.ff}
-                    </span>
-                  </label>
-                ))}
+                {gruppen.map((g) => {
+                  const ids = g.personen.map((p) => p.id);
+                  const count = ids.filter((id) => selected.has(id)).length;
+                  return (
+                    <div key={g.truppId} role="group" aria-label={g.truppName}>
+                      <div className="cal-tn-trupp">
+                        <span>
+                          {g.truppName}{' '}
+                          <span className="muted num">
+                            {count}/{ids.length}
+                          </span>
+                        </span>
+                        {canEdit && (
+                          <button type="button" className="btn btn-ghost btn-small" onClick={() => toggleTrupp(ids)}>
+                            {count === ids.length ? 'Keinen' : 'Ganzen Trupp'}
+                          </button>
+                        )}
+                      </div>
+                      {g.personen.map((t) => (
+                        <label key={t.id} className="cal-tn">
+                          <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleTn(t.id)} />
+                          <span>
+                            {t.name} <span className="muted">({t.truppName})</span>
+                          </span>
+                          <span className="muted">
+                            {rolleShort(t.rolle)} · {t.ff}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -504,5 +600,100 @@ function TerminEditor({
         </div>
       </form>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- Ressourcen (Leiter)
+
+/**
+ * Ressourcen are instance-wide, so they are managed here in the shared calendar rather than
+ * per Trupp. Only the Ausbildungsleiter creates or deletes them.
+ */
+function RessourcenPanel({
+  ressourcen,
+  onChange,
+  onRemoved,
+}: {
+  ressourcen: Ressource[];
+  onChange: (list: Ressource[]) => void;
+  onRemoved: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [standort, setStandort] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const add = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      const r = await api<Ressource>('/ressourcen', { method: 'POST', auth: 'leiter', body: { name, standort } });
+      onChange([...ressourcen, r].sort((a, b) => a.name.localeCompare(b.name, 'de')));
+      setName('');
+      setStandort('');
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  const remove = async (r: Ressource) => {
+    if (!confirm(`Ressource „${r.name}" löschen? Bestehende Termine verlieren die Buchung.`)) return;
+    try {
+      await api(`/ressourcen/${r.id}`, { method: 'DELETE', auth: 'leiter' });
+      onChange(ressourcen.filter((x) => x.id !== r.id));
+      onRemoved();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  return (
+    <section className="card stack">
+      <h3>Ressourcen</h3>
+      <p className="muted">
+        Fahrzeuge, Übungsgelände oder Geräte, die alle Trupps gemeinsam nutzen. Doppelbuchungen werden beim Eintragen
+        angezeigt — auch zwischen verschiedenen Trupps.
+      </p>
+      {error && (
+        <div className="alert alert-error">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{error}</div>
+        </div>
+      )}
+      {ressourcen.length > 0 && (
+        <ul className="cal-res-list">
+          {ressourcen.map((r) => (
+            <li key={r.id}>
+              <div>
+                <strong>{r.name}</strong>
+                {r.standort && <span className="muted"> · {r.standort}</span>}
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon cal-res-remove"
+                onClick={() => remove(r)}
+                aria-label={`${r.name} löschen`}
+                title="Ressource löschen"
+              >
+                <Icon name="trash-2" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form className="cal-res-form" onSubmit={add}>
+        <input
+          required
+          placeholder="Name, z. B. HLF Fels"
+          aria-label="Name der Ressource"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input placeholder="Standort" aria-label="Standort" value={standort} onChange={(e) => setStandort(e.target.value)} />
+        <button className="btn btn-secondary" type="submit">
+          <Icon name="plus" />
+          Hinzufügen
+        </button>
+      </form>
+    </section>
   );
 }
