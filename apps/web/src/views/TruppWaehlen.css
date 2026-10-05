@@ -57,3 +57,19 @@
   margin-top: auto;
   width: 100%;
 }
+
+/* Secondary path: Truppsuche (form a new Trupp with other waiting people). */
+.tw-suche {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tw-suche-titel {
+  margin: 0;
+}
+
+.tw-suche p {
+  margin: 0;
+  max-width: 60ch;
+}

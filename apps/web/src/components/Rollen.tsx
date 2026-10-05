@@ -62,6 +62,14 @@ export function RollenBesetzt({ besetzt }: { besetzt: readonly Rolle[] }) {
   return <RollenStatus counts={counts} />;
 }
 
+/**
+ * Same chips from a plain list of (planned) Rollen, duplicates counted — e.g. the role mix of
+ * a Truppsuche selection before the Trupp exists.
+ */
+export function RollenMix({ rollen }: { rollen: readonly (Rolle | null)[] }) {
+  return <RollenStatus counts={rollenBesetzung(rollen.map((rolle) => ({ rolle })))} />;
+}
+
 function RollenStatus({ counts }: { counts: Record<Rolle, number> }) {
   const besetzt = ROLLEN.filter((r) => counts[r] > 0).length;
   return (

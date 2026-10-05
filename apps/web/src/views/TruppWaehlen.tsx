@@ -177,6 +177,22 @@ export function TruppWaehlen() {
               </ul>
             )}
 
+            <section className="card tw-suche" aria-labelledby="tw-suche-titel">
+              <h2 id="tw-suche-titel" className="tw-suche-titel">
+                Kein passender Trupp dabei?
+              </h2>
+              <p className="muted">
+                Lieber mit anderen Wartenden zu einem neuen Trupp zusammenfinden? In der Truppsuche gibst du deine
+                Wunschrolle an und bildest mit anderen ohne Trupp einen neuen.
+              </p>
+              <div>
+                <Link to="/truppsuche" className="btn btn-secondary">
+                  <Icon name="search" />
+                  Zur Truppsuche
+                </Link>
+              </div>
+            </section>
+
             <p className="muted">
               Hast du einen Einladungslink oder QR-Code von deinem Trupp? Öffne ihn — dort kannst du direkt beitreten.
             </p>

@@ -1,0 +1,290 @@
+/* Truppsuche: own Wunschrolle, the waiting list grouped by Rolle, the selection summary. */
+.ts-intro {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.ts-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.ts-section h2 {
+  margin: 0;
+}
+
+/* ---------- Own Wunschrolle ---------- */
+
+.ts-status {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.ts-status .icon {
+  margin-top: 0.05em;
+}
+
+.ts-status-ok {
+  color: var(--success);
+}
+
+.ts-status-offen {
+  color: var(--muted);
+}
+
+.ts-rollen {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-2);
+}
+
+/* Each option is one full-width tap target; the radio itself shows the state. */
+.ts-rolle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-base);
+  font-weight: 400;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+.ts-rolle:hover {
+  background: var(--surface-sunk);
+}
+
+.ts-rolle:has(input:checked) {
+  border-color: var(--accent-text);
+  background: var(--accent-subtle);
+}
+
+.ts-rolle:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ts-rolle input,
+.ts-person input {
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--accent-fill);
+}
+
+.ts-rolle-text,
+.ts-person-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: var(--leading-tight);
+}
+
+.ts-rolle-kurz,
+.ts-person-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ts-rolle-lang,
+.ts-person-ff {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Waiting list ---------- */
+
+.ts-liste-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.ts-mix-hinweis {
+  margin: 0;
+}
+
+.ts-gruppen {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-4) var(--space-5);
+}
+
+.ts-gruppe {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.ts-gruppe-titel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+
+.ts-gruppe-leer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.ts-personen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ts-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-base);
+  font-weight: 400;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+.ts-person:hover {
+  background: var(--surface-sunk);
+}
+
+.ts-person:has(input:checked) {
+  border-color: var(--accent-text);
+  background: var(--accent-subtle);
+}
+
+.ts-person:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.ts-person:has(input:disabled:not(:checked)) {
+  opacity: 0.6;
+}
+
+.ts-person-rolle {
+  flex-shrink: 0;
+}
+
+/* ---------- Empty state ---------- */
+
+.ts-leer {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.ts-leer-icon {
+  color: var(--muted);
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.ts-leer p {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.ts-leer-titel {
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+/* ---------- Summary & confirmation ---------- */
+
+.ts-zaehler {
+  margin: 0;
+}
+
+.ts-hinweis {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.ts-hinweis .icon {
+  margin-top: 0.05em;
+}
+
+.ts-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in oklch, var(--warn) 55%, transparent);
+  border-radius: var(--radius);
+  background: var(--warn-subtle);
+}
+
+.ts-confirm h3 {
+  margin: 0;
+}
+
+.ts-confirm h3:focus {
+  outline: none;
+}
+
+.ts-confirm h3:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ts-confirm p {
+  margin: 0;
+}
+
+.ts-confirm-liste {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+@media (max-width: 30rem) {
+  .ts-bilden,
+  .ts-confirm .btn {
+    width: 100%;
+  }
+}

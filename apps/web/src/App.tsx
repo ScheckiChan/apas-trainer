@@ -16,6 +16,7 @@ import { TeilnehmerView } from './views/TeilnehmerView';
 import { TruppDashboard } from './views/TruppDashboard';
 import { TruppDetail } from './views/TruppDetail';
 import { TruppWaehlen } from './views/TruppWaehlen';
+import { Truppsuche } from './views/Truppsuche';
 
 function Laden() {
   return (
@@ -193,6 +194,8 @@ export function App() {
 
       {/* Self-service Trupp choice; a Teilnehmer already in a Trupp gets a pointer to it there. */}
       <Route path="/trupp-waehlen" element={<Gate rollen={['teilnehmer']}><TruppWaehlen /></Gate>} />
+      {/* Truppsuche: form a NEW Trupp with other waiting people; redirects to the own Trupp once in one. */}
+      <Route path="/truppsuche" element={<Gate rollen={['teilnehmer']}><Truppsuche /></Gate>} />
       <Route path="/teilnehmer" element={<Gate rollen={['teilnehmer']}><TeilnehmerView /></Gate>} />
       <Route path="/teilnehmer/stationen" element={<Navigate to="/teilnehmer?tab=stationen" replace />} />
       <Route
