@@ -1,0 +1,26 @@
+/* Trupp name with its mascot icon. Inline so it fits headings, list rows and running text. */
+.trupp-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.trupp-name-icon {
+  width: 1.05em;
+  height: 1.05em;
+  align-self: center;
+  vertical-align: 0;
+  color: var(--accent-text);
+}
+
+/* Nothing picked yet: the neutral group icon stays quiet. */
+.trupp-name-icon-default {
+  color: var(--muted);
+}
+
+.trupp-name-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

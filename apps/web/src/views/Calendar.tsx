@@ -7,11 +7,13 @@ import {
   type TerminInput,
   type TerminSaveResponse,
   type TerminTyp,
+  type TruppIcon,
 } from '@apas/shared';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AppHeader } from '../components/AppHeader';
 import { Icon } from '../components/Icon';
 import { rolleShort } from '../components/Rollen';
+import { TruppName } from '../components/TruppName';
 import { api, errorMessage } from '../lib/api';
 import { formatDateTime, formatTime, localToIso, toLocalDateKey, toLocalTime } from '../lib/format';
 import { useMe } from '../lib/session';
@@ -48,12 +50,14 @@ const OHNE_TRUPP = 'Ohne Trupp';
  * Personen grouped by Trupp, in the server's order (Trupp name, then name). Accounts without
  * a Trupp (e.g. Ausbilder, Prüfer, freshly registered) form the last group "Ohne Trupp".
  */
-function byTrupp(personen: KalenderPerson[]): { key: string; truppName: string; personen: KalenderPerson[] }[] {
-  const groups = new Map<string, { key: string; truppName: string; personen: KalenderPerson[] }>();
+type TruppGruppe = { key: string; truppName: string; truppIcon: TruppIcon | null; personen: KalenderPerson[] };
+
+function byTrupp(personen: KalenderPerson[]): TruppGruppe[] {
+  const groups = new Map<string, TruppGruppe>();
   for (const p of personen) {
     const key = p.truppId ?? '';
     let g = groups.get(key);
-    if (!g) groups.set(key, (g = { key, truppName: p.truppName ?? OHNE_TRUPP, personen: [] }));
+    if (!g) groups.set(key, (g = { key, truppName: p.truppName ?? OHNE_TRUPP, truppIcon: p.truppIcon, personen: [] }));
     g.personen.push(p);
   }
   const list = [...groups.values()];
@@ -545,7 +549,7 @@ function TerminEditor({
                     <div key={g.key || 'ohne'} role="group" aria-label={g.truppName}>
                       <div className="cal-tn-trupp">
                         <span>
-                          {g.truppName}{' '}
+                          {g.key ? <TruppName name={g.truppName} icon={g.truppIcon} /> : g.truppName}{' '}
                           <span className="muted num">
                             {count}/{ids.length}
                           </span>
@@ -561,7 +565,12 @@ function TerminEditor({
                           <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleTn(t.id)} />
                           <span>
                             {t.name}
-                            {t.truppName && <span className="muted"> ({t.truppName})</span>}
+                            {t.truppName && (
+                              <span className="muted">
+                                {' ('}
+                                <TruppName name={t.truppName} icon={t.truppIcon} />)
+                              </span>
+                            )}
                           </span>
                           <span className="muted">{personDetail(t)}</span>
                         </label>

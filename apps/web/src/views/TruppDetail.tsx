@@ -1,5 +1,6 @@
 import {
   checklistAmpel,
+  kannTruppIdentitaetBearbeiten,
   SYSTEM_ROLLE_LABELS,
   type BenutzerUebersicht,
   type ChecklistItem,
@@ -18,12 +19,17 @@ import { AmpelDot, ChecklistToggles } from '../components/Checklist';
 import { EinmalPasswort } from '../components/EinmalPasswort';
 import { Icon } from '../components/Icon';
 import { RolleSelect, RollenAbdeckung, saveRolle } from '../components/Rollen';
+import { TruppIdentitaet } from '../components/TruppIdentitaet';
+import { TruppName } from '../components/TruppName';
 import { api, errorMessage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
+import { useMe, useSession } from '../lib/session';
 import './TruppDetail.css';
 
 export function TruppDetail() {
   const { truppId } = useParams();
+  const me = useMe();
+  const { setMe } = useSession();
   const [trupp, setTrupp] = useState<Trupp | null>(null);
   const [teilnehmer, setTeilnehmer] = useState<Teilnehmer[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +71,12 @@ export function TruppDetail() {
     } catch (err) {
       alert(errorMessage(err));
     }
+  };
+
+  /** New name/icon: this page, plus the session copy if it is the account's own Trupp. */
+  const identitaetGespeichert = (updated: Trupp) => {
+    setTrupp(updated);
+    if (me.trupp?.id === updated.id) setMe({ ...me, trupp: { ...me.trupp, name: updated.name, icon: updated.icon } });
   };
 
   const remove = async (t: Teilnehmer) => {
@@ -116,7 +128,9 @@ export function TruppDetail() {
       <main className="page stack">
         <div className="gd-head">
           <div>
-            <h1>{trupp.name}</h1>
+            <h1>
+              <TruppName name={trupp.name} icon={trupp.icon} />
+            </h1>
             <p className="gd-meta">
               <span className={`num ${urgent ? 'badge badge-accent' : 'gd-countdown'}`}>
                 {countdownLabel(trupp.pruefungstermin)}
@@ -194,6 +208,14 @@ export function TruppDetail() {
           <PruefungsterminEditor trupp={trupp} onSaved={setTrupp} />
           <InvitePanel trupp={trupp} onRegenerated={setTrupp} />
         </div>
+
+        {kannTruppIdentitaetBearbeiten(me.benutzer, trupp.id) && (
+          <TruppIdentitaet
+            trupp={trupp}
+            onSaved={identitaetGespeichert}
+            intro="Name und Maskottchen des Trupps — die Mitglieder können beides auch selbst ändern."
+          />
+        )}
       </main>
     </>
   );

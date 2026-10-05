@@ -111,6 +111,12 @@ h2 + .bv-intro {
   overflow-wrap: anywhere;
 }
 
+/* TruppName is inline-flex (atomic), so the link underline has to be set on its text. */
+.bv-trupp a .trupp-name-text {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 .bv-leerwert {
   color: var(--muted);
 }
