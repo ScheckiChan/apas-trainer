@@ -8,8 +8,9 @@ import { homePath, useSession } from '../lib/session';
 import './Login.css';
 
 /**
- * /registrieren — self-registration of a global account (systemRolle Teilnehmer, no Trupp
- * yet). An Ausbilder attaches it to a Trupp later, or the person opens an invite link.
+ * /registrieren — the instance-wide invite link: self-registration of a global account
+ * (systemRolle Teilnehmer, no Trupp yet, Feuerwehr required). Afterwards the person picks a
+ * Trupp on /trupp-waehlen; an Ausbilder or a Trupp's own invite link work as before.
  */
 export function Registrieren() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ export function Registrieren() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [ff, setFf] = useState('');
+  const [ffError, setFfError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [busy, setBusy] = useState(false);
@@ -30,6 +32,7 @@ export function Registrieren() {
     e.preventDefault();
     setError(null);
     setEmailError(null);
+    setFfError(null);
     setEmailTaken(false);
     if (password !== repeat) {
       // The inline hint under the field already says what is wrong.
@@ -38,16 +41,21 @@ export function Registrieren() {
     }
     setBusy(true);
     try {
-      const body: RegistrierenRequest = { email: email.trim(), name, password, ff: ff.trim() || null };
+      const body: RegistrierenRequest = { email: email.trim(), name, password, ff: ff.trim() };
       const session = await api<AuthSession>('/auth/registrieren', { method: 'POST', auth: 'none', body });
       signIn(session);
-      navigate(homePath(session), { replace: true });
+      // A fresh Teilnehmer has no Trupp yet: picking one is the next step.
+      const ohneTrupp = session.benutzer.systemRolle === 'teilnehmer' && !session.benutzer.truppId;
+      navigate(ohneTrupp ? '/trupp-waehlen' : homePath(session), { replace: true });
     } catch (err) {
-      const inline = fieldError(err, 'email');
-      setEmailError(inline);
-      setError(formError(err, ['email']));
+      const inlineEmail = fieldError(err, 'email');
+      const inlineFf = fieldError(err, 'ff');
+      setEmailError(inlineEmail);
+      setFfError(inlineFf);
+      setError(formError(err, ['email', 'ff']));
       setEmailTaken(err instanceof HttpError && err.status === 409);
-      if (inline) document.getElementById('reg-email')?.focus();
+      if (inlineEmail) document.getElementById('reg-email')?.focus();
+      else if (inlineFf) document.getElementById('reg-ff')?.focus();
       setBusy(false);
     }
   };
@@ -62,8 +70,8 @@ export function Registrieren() {
         <form className="card stack auth-form" onSubmit={submit}>
           <h2>Registrieren</h2>
           <p className="muted">
-            Mit deinem Konto siehst du Kalender, Stationen und Rangliste. Einem Trupp wirst du von einem Ausbilder
-            zugeteilt — oder du trittst über den Einladungslink deines Trupps bei.
+            Mit deinem Konto siehst du Kalender, Stationen und Rangliste. Danach wählst du deinen Trupp selbst aus der
+            Liste.
           </p>
           {error && (
             <div className="alert alert-error" role="alert">
@@ -125,15 +133,26 @@ export function Registrieren() {
               </p>
             </div>
             <div className="field">
-              <label htmlFor="reg-ff">Feuerwehr (optional)</label>
+              <label htmlFor="reg-ff">Feuerwehr</label>
               <input
                 id="reg-ff"
+                required
                 minLength={2}
                 maxLength={100}
+                autoComplete="organization"
+                autoCapitalize="words"
                 placeholder="z. B. FF Musterdorf"
+                aria-invalid={ffError ? true : undefined}
+                aria-describedby="reg-ff-hint"
                 value={ff}
-                onChange={(e) => setFf(e.target.value)}
+                onChange={(e) => {
+                  setFf(e.target.value);
+                  setFfError(null);
+                }}
               />
+              <p id="reg-ff-hint" className={`field-hint ${ffError ? 'field-hint-error' : ''}`}>
+                {ffError ?? 'Deine Heimat-Feuerwehr.'}
+              </p>
             </div>
             <div className="field">
               <label htmlFor="reg-password">Passwort</label>

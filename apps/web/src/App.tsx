@@ -1,5 +1,5 @@
 import { kannErgebnisSpeichern, type SystemRolle } from '@apas/shared';
-import { useEffect, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppHeader } from './components/AppHeader';
 import { Icon } from './components/Icon';
@@ -15,6 +15,7 @@ import { Stations } from './views/Stations';
 import { TeilnehmerView } from './views/TeilnehmerView';
 import { TruppDashboard } from './views/TruppDashboard';
 import { TruppDetail } from './views/TruppDetail';
+import { TruppWaehlen } from './views/TruppWaehlen';
 
 function Laden() {
   return (
@@ -74,10 +75,17 @@ function Home() {
   return <Navigate to={homePath(state.me)} replace />;
 }
 
-/** /login and /registrieren are pointless once signed in. */
+/**
+ * /login and /registrieren are pointless once signed in. Only for visitors who arrive already
+ * signed in: when the page itself signs someone in, it navigates on its own (Login → `from`,
+ * Registrieren → /trupp-waehlen). The router applies that navigation in a transition, so the
+ * session update renders first — redirecting here would overwrite the page's target.
+ */
 function NurAbgemeldet({ children }: { children: ReactElement }) {
   const { state } = useSession();
-  if (state.status === 'ready') return <Navigate to={homePath(state.me)} replace />;
+  const warAbgemeldet = useRef(false);
+  if (state.status === 'anon') warAbgemeldet.current = true;
+  if (state.status === 'ready' && !warAbgemeldet.current) return <Navigate to={homePath(state.me)} replace />;
   return children;
 }
 
@@ -183,6 +191,8 @@ export function App() {
         element={<Gate><TruppZugang><StationDetailPage /></TruppZugang></Gate>}
       />
 
+      {/* Self-service Trupp choice; a Teilnehmer already in a Trupp gets a pointer to it there. */}
+      <Route path="/trupp-waehlen" element={<Gate rollen={['teilnehmer']}><TruppWaehlen /></Gate>} />
       <Route path="/teilnehmer" element={<Gate rollen={['teilnehmer']}><TeilnehmerView /></Gate>} />
       <Route path="/teilnehmer/stationen" element={<Navigate to="/teilnehmer?tab=stationen" replace />} />
       <Route

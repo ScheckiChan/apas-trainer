@@ -50,7 +50,19 @@ export function RolleSelect({
  * by several Teilnehmer (Ergänzungsteilnehmer), shown as "×2".
  */
 export function RollenAbdeckung({ teilnehmer }: { teilnehmer: Teilnehmer[] }) {
-  const counts = rollenBesetzung(teilnehmer);
+  return <RollenStatus counts={rollenBesetzung(teilnehmer)} />;
+}
+
+/**
+ * Same chips from a plain list of taken Rollen (e.g. GET /trupps/waehlbar, which carries no
+ * member data) — each listed Rolle counts once.
+ */
+export function RollenBesetzt({ besetzt }: { besetzt: readonly Rolle[] }) {
+  const counts = Object.fromEntries(ROLLEN.map((r) => [r, besetzt.includes(r) ? 1 : 0])) as Record<Rolle, number>;
+  return <RollenStatus counts={counts} />;
+}
+
+function RollenStatus({ counts }: { counts: Record<Rolle, number> }) {
   const besetzt = ROLLEN.filter((r) => counts[r] > 0).length;
   return (
     <div className="rollen-abdeckung">

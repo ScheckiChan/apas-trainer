@@ -11,7 +11,7 @@ import {
   type Trupp,
 } from '@apas/shared';
 import { useCallback, useEffect, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
 import { HauptNav } from '../components/HauptNav';
@@ -184,8 +184,8 @@ function TruppHome({ me, benutzer, trupp }: { me: MeResponse; benutzer: Mitglied
 }
 
 /**
- * Registered, but not in a Trupp yet: nothing to do but wait for an Ausbilder (or open the
- * invite link). Kalender, Rangliste and the Stationen are open to everyone meanwhile.
+ * Registered, but not in a Trupp yet: points to /trupp-waehlen (self-service), an Ausbilder may
+ * also assign them. Kalender, Rangliste and the Stationen are open to everyone meanwhile.
  */
 function OhneTrupp({ benutzer }: { benutzer: Benutzer }) {
   const { refresh } = useSession();
@@ -211,17 +211,23 @@ function OhneTrupp({ benutzer }: { benutzer: Benutzer }) {
       <section className="card stack">
         <h2>Noch in keinem Trupp</h2>
         <p>
-          Ein Ausbilder fügt dich einem Trupp hinzu — danach siehst du hier eure Checkliste, die Rollen und den
-          Countdown bis zur Prüfung. Hast du einen Einladungslink oder QR-Code deines Trupps, öffne ihn: Dort kannst du
-          direkt beitreten.
+          Wähle deinen Trupp — danach siehst du hier eure Checkliste, die Rollen und den Countdown bis
+          zur Prüfung.
         </p>
-        <p className="muted">Bis dahin stehen dir Stationen, Kalender und Rangliste offen.</p>
-        <div>
-          <button type="button" className="btn btn-secondary btn-small" onClick={pruefen} disabled={busy} aria-busy={busy}>
+        <div className="btn-row">
+          <Link to="/trupp-waehlen" className="btn">
+            <Icon name="users" />
+            Trupp wählen
+          </Link>
+          <button type="button" className="btn btn-ghost btn-small" onClick={pruefen} disabled={busy} aria-busy={busy}>
             <Icon name="refresh-cw" />
             {busy ? 'Prüfe…' : 'Erneut prüfen'}
           </button>
         </div>
+        <p className="muted">
+          Hat dich ein Ausbilder schon eingeteilt, tippe auf „Erneut prüfen". Bis dahin stehen dir Stationen, Kalender
+          und Rangliste offen.
+        </p>
       </section>
       <Stations basePath="/stationen" />
     </>
