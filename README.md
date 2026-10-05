@@ -12,7 +12,8 @@ towards the same Prüfungstermin with live feedback.
 
 - **Self-service onboarding** — one shareable invite link (+ QR code) per exam instance;
   people register with e-mail, password, name and Feuerwehr, then pick their own Trupp and
-  APAS-Rolle (GKDT, ATF/ATM1, ATM2, Wassertruppführer).
+  APAS-Rolle (GKDT, ATF/ATM1, ATM2, Wassertruppführer) — or, via the **Truppsuche**, set a
+  Wunschrolle and team up with other people still without a Trupp into a brand-new one.
 - **Role-based access** — Ausbilder (full control), Prüfer (score any Trupp live), Teilnehmer
   (their own Trupp, checklist and results).
 - **Station training** — step-by-step walkthroughs, a live stopwatch per station with

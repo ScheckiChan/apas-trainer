@@ -244,7 +244,7 @@ Things SPEC.md left open and how they were resolved:
     Individualübungen. Other Trupps answer `404`, as before.
   - Everyone signed in: Kalender (read, Individualübungen), Ressourcen (read), Rangliste,
     Stationen.
-- **Two invite paths coexist**:
+- **Two invite paths coexist** (plus the Truppsuche as a second self-service path):
   - **Instance-wide link** — `/registrieren` itself. One link for the whole Ausbildung; an
     Ausbilder copies it (or shows its QR code) from the "Teilnehmer einladen" card at the
     bottom of the Trupp dashboard. After registering, the new Teilnehmer lands on
@@ -258,6 +258,31 @@ Things SPEC.md left open and how they were resolved:
     `409` (an Ausbilder moves it), joining the same Trupp again is a no-op.
   - **Per-Trupp link** — `/join/:inviteToken` from TruppDetail, unchanged: registers
     ("Neu beitreten") or attaches a signed-in account directly to that one Trupp.
+  - **Truppsuche** — `/truppsuche`, linked from `/trupp-waehlen` ("Kein passender Trupp
+    dabei?"). The second self-service path, for the opposite case: several Trupp-less people
+    group themselves into a **new** Trupp instead of joining an existing one.
+    - `Benutzer.gewuenschteRolle: Rolle | null` is the Rolle someone wants once matched,
+      separate from `rolle` (held inside a Trupp). Settable only while `truppId === null`
+      (`PATCH /benutzer/me/gewuenschte-rolle`, Teilnehmer only, `409` when in a Trupp).
+      Every path into a Trupp (self-join, invite link, Ausbilder assignment, Truppsuche)
+      clears it via `inTruppSetzen()` in `lib/beitreten.ts`; migration
+      `migrateGewuenschteRolle` defaults old records to `null`.
+    - `GET /truppsuche` lists the **other** Trupp-less Teilnehmer with a Wunschrolle — only
+      id, name, FF, Wunschrolle (no Checkliste, no e-mail, same rule as
+      `GET /termine/personen`), sorted by Rolle then name; the screen groups by Rolle with
+      counts so the role mix is visible. Teilnehmer in a Trupp get `409`, Ausbilder may read
+      it, Prüfer get `403`.
+    - `POST /truppsuche/trupp` `{ benutzerIds }` (the others; the caller is implicit) forms
+      the Trupp explicitly — no background matching, nobody is moved silently. 2–6 people
+      total (`TRUPPSUCHE_MIN/MAX_PERSONEN`; duplicate Rollen allowed as elsewhere, but no
+      absurd sizes). Everything is re-validated inside the write lock; if anyone selected is
+      no longer available (grabbed meanwhile, deleted, Wunschrolle cleared) the whole action
+      fails with `409` (`details.nichtVerfuegbar`) and nothing is applied. The Trupp is
+      created exactly like an Ausbilder-created one without Prüfungstermin (shared
+      `newTruppRecord` in `lib/trupp.ts`), named "Trupp <FF of the initiator>" (or "Neuer
+      Trupp", suffixed " 2", " 3"… on collision); each person gets `rolle` = their
+      Wunschrolle. Rate-limited to 10 attempts / 15 min per account. Ausbilder can rename,
+      edit or delete (members are kept and detached) the result as with any Trupp.
   Both join endpoints share one implementation (`lib/beitreten.ts`). The self-join lives
   under `/trupps/waehlbar/…` rather than `/trupps/:truppId/beitreten` because the latter has
   the same shape as the token route `/trupps/:token/beitreten` and would be ambiguous.
