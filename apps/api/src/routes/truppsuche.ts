@@ -169,7 +169,7 @@ truppsucheRouter.post('/trupp', requireAuth, async (req, res) => {
       if (weg.length || unbekannt) {
         const teile = [
           ...(weg.length ? [`${weg.join(', ')} ${weg.length === 1 ? 'ist' : 'sind'} nicht mehr in der Truppsuche`] : []),
-          ...(unbekannt ? [`${unbekannt === 1 ? 'eine ausgewählte Person gibt' : `${unbekannt} ausgewählte Personen gibt`} es nicht mehr`] : []),
+          ...(unbekannt ? [`${unbekannt === 1 ? 'Eine ausgewählte Person gibt' : `${unbekannt} ausgewählte Personen gibt`} es nicht mehr`] : []),
         ];
         throw new HttpError(
           409,
