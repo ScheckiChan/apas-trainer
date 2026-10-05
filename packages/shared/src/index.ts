@@ -204,9 +204,6 @@ export const STATION_WERTUNG: Record<StationId, { titel: string; teile: { titel:
   },
 };
 
-/** Bestehensregel: at most 35 Fehlerpunkte over all stations (plus every station within its own limit). */
-export const GESAMT_MAX_FEHLERPUNKTE = 35;
-
 /** "Zeitüberschreitung: 2 Punkte je 10 Sek." — every started 10-second block counts. */
 export const ZEIT_PUNKTE_JE_10_SEK = 2;
 
@@ -254,64 +251,44 @@ export interface RanglistenEintrag {
   truppName: string;
   /** The calling Teilnehmer's own Trupp (always false for an Ausbildungsleiter, who usually owns them all). */
   eigen: boolean;
-  /** Recorded stations in STATION_IDS order. */
-  ergebnisse: StationErgebnis[];
-  absolviert: number;
-  vollstaendig: boolean;
-  gesamtFehlerpunkte: number;
-  /** Overall Bestehensregel on what is recorded so far — final only when `vollstaendig`. */
-  bestanden: boolean;
-  /** 1-based rank among complete Trupps (ties share a rank); null while incomplete. */
-  rang: number | null;
+  /** This Trupp's latest recorded run at the station. */
+  ergebnis: StationErgebnis;
+  /** 1-based rank by Zeit; equal times share a rank (1, 1, 3). */
+  rang: number;
 }
 
-/** Overall Bestehensregel: total ≤ 35 and no station over its own limit. */
-export function gesamtBestanden(ergebnisse: readonly StationErgebnis[]): boolean {
-  const total = ergebnisse.reduce((s, e) => s + e.fehlerpunkte, 0);
-  return total <= GESAMT_MAX_FEHLERPUNKTE && ergebnisse.every((e) => e.bestanden);
+/** GET /rangliste: one leaderboard per station, in STATION_IDS order. */
+export interface StationRangliste {
+  stationId: StationId;
+  /** Only Trupps with a recorded result for this station, fastest first. */
+  eintraege: RanglistenEintrag[];
 }
 
 /**
- * Ranking: complete Trupps first — passed before failed, then fewer Fehlerpunkte first.
- * Incomplete Trupps follow without a rank (more stations done first), so one great station
- * never outranks four solid ones.
+ * Per-station leaderboards: every Trupp with a result for a station is ranked there by Zeit
+ * (fastest first; for Station 4 the sum of both Teile). Fehlerpunkte and bestanden are shown
+ * alongside but don't move a Trupp — they only break the order within an equal time.
  */
-export function rangliste(
+export function stationsRanglisten(
   trupps: readonly { truppId: string; truppName: string; eigen: boolean; ergebnisse: readonly StationErgebnis[] }[],
-): RanglistenEintrag[] {
-  const rows = trupps.map((t): RanglistenEintrag => {
-    const ergebnisse = STATION_IDS.flatMap((id) => t.ergebnisse.filter((e) => e.stationId === id));
-    return {
-      truppId: t.truppId,
-      truppName: t.truppName,
-      eigen: t.eigen,
-      ergebnisse,
-      absolviert: ergebnisse.length,
-      vollstaendig: ergebnisse.length === STATION_IDS.length,
-      gesamtFehlerpunkte: ergebnisse.reduce((s, e) => s + e.fehlerpunkte, 0),
-      bestanden: gesamtBestanden(ergebnisse),
-      rang: null,
-    };
+): StationRangliste[] {
+  return STATION_IDS.map((stationId) => {
+    const eintraege = trupps.flatMap((t): RanglistenEintrag[] => {
+      const ergebnis = t.ergebnisse.find((e) => e.stationId === stationId);
+      return ergebnis ? [{ truppId: t.truppId, truppName: t.truppName, eigen: t.eigen, ergebnis, rang: 0 }] : [];
+    });
+    eintraege.sort(
+      (a, b) =>
+        a.ergebnis.zeitSekunden - b.ergebnis.zeitSekunden ||
+        a.ergebnis.fehlerpunkte - b.ergebnis.fehlerpunkte ||
+        a.truppName.localeCompare(b.truppName, 'de'),
+    );
+    eintraege.forEach((r, i) => {
+      const prev = eintraege[i - 1];
+      r.rang = prev && prev.ergebnis.zeitSekunden === r.ergebnis.zeitSekunden ? prev.rang : i + 1;
+    });
+    return { stationId, eintraege };
   });
-
-  const group = (r: RanglistenEintrag) => (!r.vollstaendig ? 2 : r.bestanden ? 0 : 1);
-  rows.sort(
-    (a, b) =>
-      group(a) - group(b) ||
-      (group(a) === 2 ? b.absolviert - a.absolviert : 0) ||
-      a.gesamtFehlerpunkte - b.gesamtFehlerpunkte ||
-      a.truppName.localeCompare(b.truppName, 'de'),
-  );
-
-  rows.forEach((r, i) => {
-    if (!r.vollstaendig) return;
-    const prev = rows[i - 1];
-    r.rang =
-      prev && prev.vollstaendig && group(prev) === group(r) && prev.gesamtFehlerpunkte === r.gesamtFehlerpunkte
-        ? prev.rang
-        : i + 1;
-  });
-  return rows;
 }
 
 // ---------------------------------------------------------------------------

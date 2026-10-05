@@ -1,9 +1,9 @@
 import {
   isStationId,
-  rangliste,
   STATION_WERTUNG,
   stationBestanden,
-  type RanglistenEintrag,
+  stationsRanglisten,
+  type StationRangliste,
   type TeilErgebnis,
 } from '@apas/shared';
 import { Router } from 'express';
@@ -75,14 +75,14 @@ ergebnisseRouter.put('/:stationId', requireLeiter, async (req, res) => {
 });
 
 /**
- * Mounted at /api/rangliste. Every Trupp of this Ausbildung, visible to any signed-in
- * Ausbildungsleiter or Teilnehmer — the Rangliste is meant to be seen.
+ * Mounted at /api/rangliste. One leaderboard per station over every Trupp of this Ausbildung,
+ * visible to any signed-in Ausbildungsleiter or Teilnehmer — the Rangliste is meant to be seen.
  */
 export const ranglisteRouter = Router();
 
 ranglisteRouter.get('/', requireAny, async (req, res) => {
   const [trupps, ergebnisse] = await Promise.all([db.trupps.all(), db.ergebnisse.all()]);
-  const body: RanglistenEintrag[] = rangliste(
+  const body: StationRangliste[] = stationsRanglisten(
     trupps.map((t) => ({
       truppId: t.id,
       truppName: t.name,
