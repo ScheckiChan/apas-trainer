@@ -1,0 +1,178 @@
+.steps-progress-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--grey);
+  margin-bottom: 0.3rem;
+}
+
+.steps-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--grey-light);
+  overflow: hidden;
+}
+
+.steps-progress > div {
+  height: 100%;
+  background: var(--red);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.steps-stage {
+  margin-top: 0.75rem;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.steps-card {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  min-height: 9rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--dark);
+  color: #fff;
+}
+
+.steps-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.4rem;
+}
+
+.steps-card p {
+  margin: 0;
+}
+
+.steps-card ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.steps-card li + li {
+  margin-top: 0.35rem;
+}
+
+.steps-card-body {
+  min-width: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.steps-card-nr {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: var(--red);
+  font-weight: 800;
+  font-size: 1.15rem;
+}
+
+.steps-enter-next {
+  animation: steps-in-next 0.32s ease-out;
+}
+
+.steps-enter-prev {
+  animation: steps-in-prev 0.32s ease-out;
+}
+
+@keyframes steps-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(2.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes steps-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-2.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.steps-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.steps-nav .btn {
+  min-height: 3rem;
+  font-size: 1rem;
+}
+
+.steps-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.steps-list button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--grey);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.steps-list-nr {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  border: 2px solid var(--grey-light);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.steps-list-done button {
+  color: var(--text);
+}
+
+.steps-list-done .steps-list-nr {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.steps-list-active button {
+  background: var(--red-soft);
+  color: var(--red-dark);
+  font-weight: 700;
+}
+
+.steps-list-active .steps-list-nr {
+  border-color: var(--red);
+  background: var(--red);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .steps-enter-next,
+  .steps-enter-prev {
+    animation: none;
+  }
+}

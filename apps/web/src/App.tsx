@@ -7,6 +7,7 @@ import { GroupDetail } from './views/GroupDetail';
 import { GroupsDashboard } from './views/GroupsDashboard';
 import { Join } from './views/Join';
 import { Login } from './views/Login';
+import { StationDetail } from './views/StationDetail';
 import { Stations } from './views/Stations';
 import { TeilnehmerView } from './views/TeilnehmerView';
 
@@ -36,13 +37,35 @@ function LeiterCalendarPage() {
   );
 }
 
-function StationsPage() {
+/** Where the station overview lives for the current URL, and where its back arrow goes. */
+function useStationsBase(): { basePath: string; backTo: string } {
   const { gruppeId } = useParams();
+  if (gruppeId) return { basePath: `/gruppen/${gruppeId}/stationen`, backTo: `/gruppen/${gruppeId}` };
+  return { basePath: '/stationen', backTo: '/' };
+}
+
+function StationsPage() {
+  const { basePath, backTo } = useStationsBase();
   return (
     <>
-      <AppHeader backTo={gruppeId ? `/gruppen/${gruppeId}` : '/'} />
+      <AppHeader backTo={backTo} />
       <main className="page">
-        <Stations />
+        <Stations basePath={basePath} />
+      </main>
+    </>
+  );
+}
+
+function StationDetailPage({ teilnehmer }: { teilnehmer?: boolean }) {
+  const { stationId } = useParams();
+  const base = useStationsBase();
+  // Teilnehmer see the overview as a tab; /teilnehmer/stationen redirects back to that tab.
+  const basePath = teilnehmer ? '/teilnehmer/stationen' : base.basePath;
+  return (
+    <>
+      <AppHeader backTo={basePath} />
+      <main className="page">
+        <StationDetail stationId={stationId} basePath={basePath} />
       </main>
     </>
   );
@@ -67,13 +90,17 @@ export function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/join/:token" element={<Join />} />
       <Route path="/stationen" element={<StationsPage />} />
+      <Route path="/stationen/:stationId" element={<StationDetailPage />} />
 
       <Route path="/gruppen" element={<RequireLeiter><GroupsDashboard /></RequireLeiter>} />
       <Route path="/gruppen/:gruppeId" element={<RequireLeiter><GroupDetail /></RequireLeiter>} />
       <Route path="/gruppen/:gruppeId/kalender" element={<RequireLeiter><LeiterCalendarPage /></RequireLeiter>} />
       <Route path="/gruppen/:gruppeId/stationen" element={<RequireLeiter><StationsPage /></RequireLeiter>} />
+      <Route path="/gruppen/:gruppeId/stationen/:stationId" element={<RequireLeiter><StationDetailPage /></RequireLeiter>} />
 
       <Route path="/teilnehmer" element={<RequireTeilnehmer><TeilnehmerView /></RequireTeilnehmer>} />
+      <Route path="/teilnehmer/stationen" element={<Navigate to="/teilnehmer?tab=stationen" replace />} />
+      <Route path="/teilnehmer/stationen/:stationId" element={<RequireTeilnehmer><StationDetailPage teilnehmer /></RequireTeilnehmer>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

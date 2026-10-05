@@ -1,0 +1,138 @@
+.flash-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.flash-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--grey);
+}
+
+.flash-card {
+  display: block;
+  cursor: pointer;
+  user-select: none;
+  perspective: 1200px;
+  -webkit-tap-highlight-color: transparent;
+  animation: flash-in 0.25s ease-out;
+}
+
+/* Both faces share one grid cell, so the card is as tall as its longer side. */
+.flash-inner {
+  display: grid;
+  transition: transform 0.45s ease;
+  transform-style: preserve-3d;
+}
+
+.flash-flipped .flash-inner {
+  transform: rotateY(180deg);
+}
+
+.flash-face {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 13rem;
+  padding: 1.1rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flash-front {
+  background: var(--surface);
+  border: 2px solid var(--red);
+}
+
+.flash-back {
+  background: var(--dark);
+  color: #fff;
+  transform: rotateY(180deg);
+}
+
+.flash-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--red);
+}
+
+.flash-back .flash-label {
+  color: #ff8a80;
+}
+
+.flash-question {
+  flex: 1;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.flash-answer {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+
+ul.flash-answer {
+  padding-left: 1.1rem;
+}
+
+ul.flash-answer li + li {
+  margin-top: 0.3rem;
+}
+
+.flash-hint {
+  font-size: 0.8rem;
+  color: var(--grey);
+}
+
+.flash-card:focus-visible {
+  outline: none;
+}
+
+.flash-card:focus-visible .flash-face {
+  outline: 3px solid var(--red);
+  outline-offset: 2px;
+}
+
+.flash-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.flash-nav .btn {
+  min-height: 3rem;
+  font-size: 1rem;
+}
+
+@keyframes flash-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-card {
+    animation: none;
+  }
+
+  .flash-inner {
+    transition: none;
+  }
+}

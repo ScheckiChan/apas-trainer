@@ -1,15 +1,19 @@
+import { Link } from 'react-router-dom';
 import { FEHLERPUNKTE_REGELN, QUELLE, STATIONEN } from '../content/stations';
 import './Stations.css';
 
-/** Static Stationskarten for APAS Bronze. */
-export function Stations() {
+/**
+ * Static Stationskarten for APAS Bronze. Each card links to the station's deep dive at
+ * `${basePath}/${station.id}` (basePath depends on where the overview is mounted).
+ */
+export function Stations({ basePath }: { basePath: string }) {
   return (
     <div className="stations stack">
       <h1>Stationen — APAS Bronze</h1>
 
       <div className="stations-grid">
         {STATIONEN.map((s) => (
-          <article key={s.nr} className="card station-card">
+          <Link key={s.nr} to={`${basePath}/${s.id}`} className="card station-card">
             <div className="station-nr">Station {s.nr}</div>
             <h2>{s.titel}</h2>
             <p>{s.ablauf}</p>
@@ -18,7 +22,8 @@ export function Stations() {
                 <li key={p}>{p}</li>
               ))}
             </ul>
-          </article>
+            <span className="station-more">Ablauf, Checkliste{s.fragenkatalog ? ' & Lernkarten' : ''} →</span>
+          </Link>
         ))}
       </div>
 

@@ -8,7 +8,7 @@ import {
   type Teilnehmer,
 } from '@apas/shared';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
 import { PushButton } from '../components/PushButton';
@@ -19,14 +19,20 @@ import { Calendar } from './Calendar';
 import { Stations } from './Stations';
 import './TeilnehmerView.css';
 
-type Tab = 'checkliste' | 'gruppe' | 'kalender' | 'stationen';
+const TABS = ['checkliste', 'gruppe', 'kalender', 'stationen'] as const;
+type Tab = (typeof TABS)[number];
+const isTab = (v: string | null): v is Tab => TABS.includes(v as Tab);
 
 export function TeilnehmerView() {
   const navigate = useNavigate();
   const [me, setMe] = useState<Teilnehmer | null>(null);
   const [gruppe, setGruppe] = useState<Gruppe | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('checkliste');
+  // ?tab= so the station detail pages can link back to the Stationen tab.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab: Tab = isTab(tabParam) ? tabParam : 'checkliste';
+  const setTab = (t: Tab) => setSearchParams(t === 'checkliste' ? {} : { tab: t }, { replace: true });
 
   useEffect(() => {
     api<{ teilnehmer: Teilnehmer; gruppe: Gruppe }>('/auth/teilnehmer/me', { auth: 'teilnehmer' })
@@ -146,7 +152,7 @@ export function TeilnehmerView() {
 
             {tab === 'kalender' && <Calendar gruppeId={gruppe.id} auth="teilnehmer" currentTeilnehmerId={me.id} />}
 
-            {tab === 'stationen' && <Stations />}
+            {tab === 'stationen' && <Stations basePath="/teilnehmer/stationen" />}
           </>
         )}
       </main>

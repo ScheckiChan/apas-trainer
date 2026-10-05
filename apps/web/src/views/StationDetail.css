@@ -1,0 +1,104 @@
+.sd h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.sd h2 {
+  font-size: 1.15rem;
+}
+
+.sd-back {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.35rem 0;
+  margin-bottom: 0.4rem;
+}
+
+.sd-zeit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.sd-zeit-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--red);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+
+.sd-zeit-chip strong {
+  font-size: 1.45rem;
+  line-height: 1.15;
+}
+
+.sd-zeit-chip .sd-zeit-text {
+  font-size: 1rem;
+}
+
+.sd-zeit-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+
+.sd-zeit-min {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.sd-hinweise {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.sd-intro {
+  margin: 0 0 0.75rem;
+}
+
+.sd-zusatz p,
+.sd-zusatz ol {
+  margin: 0;
+}
+
+.sd-zusatz ol {
+  padding-left: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.sd-zusatz li + li {
+  margin-top: 0.35rem;
+}
+
+.sd-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sd-pager .btn {
+  min-height: 2.75rem;
+}
+
+@media (max-width: 420px) {
+  .sd-zeit {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sd-zeit-chip {
+    padding: 0.6rem 0.7rem;
+  }
+
+  .sd-zeit-chip strong {
+    font-size: 1.2rem;
+  }
+}
