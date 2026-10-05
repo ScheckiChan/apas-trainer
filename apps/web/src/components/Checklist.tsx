@@ -4,11 +4,15 @@ import {
   checklistAmpel,
   isChecklistItemRequired,
   type Ampel,
+  type Checkliste,
   type ChecklistItem,
-  type Teilnehmer,
+  type Rolle,
 } from '@apas/shared';
 import { Icon, type IconName } from './Icon';
 import './Checklist.css';
+
+/** Whatever carries a Checkliste: a Trupp member or the signed-in account. */
+type MitCheckliste = { rolle: Rolle | null; checkliste: Checkliste };
 
 const AMPEL_TITLE: Record<Ampel, string> = {
   gruen: 'Alle Voraussetzungen erfüllt',
@@ -23,7 +27,7 @@ const AMPEL_ICON: Record<Ampel, IconName> = {
   rot: 'circle',
 };
 
-export function AmpelDot({ teilnehmer }: { teilnehmer: Teilnehmer }) {
+export function AmpelDot({ teilnehmer }: { teilnehmer: MitCheckliste }) {
   const a = checklistAmpel(teilnehmer.rolle, teilnehmer.checkliste);
   return (
     <span className={`ampel ampel-${a}`} title={AMPEL_TITLE[a]} role="img" aria-label={AMPEL_TITLE[a]}>
@@ -42,7 +46,7 @@ export function ChecklistToggles({
   disabled,
   compact,
 }: {
-  teilnehmer: Teilnehmer;
+  teilnehmer: MitCheckliste;
   onToggle?: (item: ChecklistItem) => void;
   disabled?: boolean;
   compact?: boolean;

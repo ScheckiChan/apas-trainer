@@ -41,3 +41,22 @@
   width: auto;
   margin-top: var(--space-2);
 }
+
+/* Signed-in state: who is on this device. */
+.join-who {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.join-who > .icon {
+  margin-top: 0.1em;
+  color: var(--muted);
+}
+
+.join .join-logout {
+  width: auto;
+  color: var(--accent-text);
+}

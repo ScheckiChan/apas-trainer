@@ -1,4 +1,4 @@
-import { api, type AuthKind } from './api';
+import { api } from './api';
 
 export function registerServiceWorker(): void {
   if (!('serviceWorker' in navigator)) return;
@@ -21,7 +21,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 }
 
 /** Asks for permission, subscribes this device and registers it with the API. */
-export async function enablePush(auth: Exclude<AuthKind, 'none'>): Promise<void> {
+export async function enablePush(): Promise<void> {
   if (!pushSupported()) throw new Error('Dieser Browser unterstützt keine Push-Benachrichtigungen');
   const { enabled, publicKey } = await api<{ enabled: boolean; publicKey: string | null }>(
     '/push/vapid-public-key',
@@ -38,5 +38,5 @@ export async function enablePush(auth: Exclude<AuthKind, 'none'>): Promise<void>
     existing ??
     (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) }));
   const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
-  await api('/push/subscribe', { method: 'POST', auth, body: { endpoint: json.endpoint, keys: json.keys } });
+  await api('/push/subscribe', { method: 'POST', body: { endpoint: json.endpoint, keys: json.keys } });
 }

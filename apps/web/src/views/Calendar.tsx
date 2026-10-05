@@ -1,8 +1,8 @@
 import {
+  SYSTEM_ROLLE_LABELS,
   type BuchungsKonflikt,
   type KalenderPerson,
   type Ressource,
-  type Teilnehmer,
   type Termin,
   type TerminInput,
   type TerminSaveResponse,
@@ -12,16 +12,16 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { AppHeader } from '../components/AppHeader';
 import { Icon } from '../components/Icon';
 import { rolleShort } from '../components/Rollen';
-import { api, errorMessage, getToken } from '../lib/api';
+import { api, errorMessage } from '../lib/api';
 import { formatDateTime, formatTime, localToIso, toLocalDateKey, toLocalTime } from '../lib/format';
+import { useMe } from '../lib/session';
 import './Calendar.css';
 
-type Auth = 'leiter' | 'teilnehmer';
-
 interface CalendarProps {
-  auth: Auth;
-  /** Set when a Teilnehmer is viewing — used for permissions and defaults. */
-  currentTeilnehmerId?: string;
+  /** Ausbilder manage Fixtermine and Ressourcen and may edit every Termin. */
+  ausbilder: boolean;
+  /** The signed-in account — creator of new Termine, may edit its own Individualübungen. */
+  currentId: string;
 }
 
 type EditorState =
@@ -42,32 +42,37 @@ function TypIcon({ typ }: { typ: TerminTyp }) {
 }
 const monthFmt = new Intl.DateTimeFormat('de-AT', { month: 'long', year: 'numeric' });
 
-/** Personen grouped by Trupp, in the server's order (Trupp name, then name). */
-function byTrupp(personen: KalenderPerson[]): { truppId: string; truppName: string; personen: KalenderPerson[] }[] {
-  const groups = new Map<string, { truppId: string; truppName: string; personen: KalenderPerson[] }>();
+const OHNE_TRUPP = 'Ohne Trupp';
+
+/**
+ * Personen grouped by Trupp, in the server's order (Trupp name, then name). Accounts without
+ * a Trupp (e.g. Ausbilder, Prüfer, freshly registered) form the last group "Ohne Trupp".
+ */
+function byTrupp(personen: KalenderPerson[]): { key: string; truppName: string; personen: KalenderPerson[] }[] {
+  const groups = new Map<string, { key: string; truppName: string; personen: KalenderPerson[] }>();
   for (const p of personen) {
-    let g = groups.get(p.truppId);
-    if (!g) groups.set(p.truppId, (g = { truppId: p.truppId, truppName: p.truppName, personen: [] }));
+    const key = p.truppId ?? '';
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = { key, truppName: p.truppName ?? OHNE_TRUPP, personen: [] }));
     g.personen.push(p);
   }
-  return [...groups.values()];
+  const list = [...groups.values()];
+  return [...list.filter((g) => g.key), ...list.filter((g) => !g.key)];
 }
 
 /**
- * /kalender — the one shared calendar of this Ausbildung, for the Ausbildungsleiter and the
- * Teilnehmer of every Trupp. The Leiter session wins if both are present (like the Rangliste).
+ * "ATF/ATM1 · FF Fels" — the systemRolle instead of the APAS-Rolle for Ausbilder / Prüfer,
+ * no APAS-Rolle at all for people without a Trupp.
  */
-export function KalenderPage() {
-  const auth: Auth = getToken('leiter') ? 'leiter' : 'teilnehmer';
-  const [meId, setMeId] = useState<string | undefined>();
-  const [error, setError] = useState<string | null>(null);
+function personDetail(p: KalenderPerson): string {
+  const rolle =
+    p.systemRolle !== 'teilnehmer' ? SYSTEM_ROLLE_LABELS[p.systemRolle] : p.truppId ? rolleShort(p.rolle) : null;
+  return [rolle, p.ff].filter(Boolean).join(' · ');
+}
 
-  useEffect(() => {
-    if (auth !== 'teilnehmer') return;
-    api<{ teilnehmer: Teilnehmer }>('/auth/teilnehmer/me', { auth })
-      .then((r) => setMeId(r.teilnehmer.id))
-      .catch((err) => setError(errorMessage(err)));
-  }, [auth]);
+/** /kalender — the one shared calendar of this Ausbildung, for every account. */
+export function KalenderPage() {
+  const me = useMe();
 
   return (
     <>
@@ -77,16 +82,7 @@ export function KalenderPage() {
           <h1>Kalender</h1>
           <p className="muted">Ein gemeinsamer Kalender für alle Trupps dieser Ausbildung.</p>
         </div>
-        {error ? (
-          <div className="alert alert-error">
-            <Icon name="triangle-alert" />
-            <div className="alert-body">{error}</div>
-          </div>
-        ) : auth === 'teilnehmer' && !meId ? (
-          <p className="muted">Lade…</p>
-        ) : (
-          <Calendar auth={auth} currentTeilnehmerId={meId} />
-        )}
+        <Calendar ausbilder={me.benutzer.systemRolle === 'ausbilder'} currentId={me.benutzer.id} />
       </main>
     </>
   );
@@ -100,7 +96,7 @@ function buildGrid(month: Date): Date[] {
   return Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
 }
 
-export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
+export function Calendar({ ausbilder, currentId }: CalendarProps) {
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -121,13 +117,12 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
       setTermine(
         await api<Termin[]>(
           `/termine?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
-          { auth },
         ),
       );
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, [grid, auth]);
+  }, [grid]);
 
   useEffect(() => {
     void loadTermine();
@@ -135,15 +130,15 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
 
   useEffect(() => {
     Promise.all([
-      api<KalenderPerson[]>('/termine/personen', { auth }),
-      api<Ressource[]>('/ressourcen', { auth }),
+      api<KalenderPerson[]>('/termine/personen'),
+      api<Ressource[]>('/ressourcen'),
     ])
       .then(([p, r]) => {
         setPersonen(p);
         setRessourcen(r);
       })
       .catch((err) => setError(errorMessage(err)));
-  }, [auth]);
+  }, []);
 
   const termineOn = (day: Date): Termin[] => {
     const start = day.getTime();
@@ -182,7 +177,7 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
           </button>
         </div>
         <div className="btn-row">
-          {auth === 'leiter' && (
+          {ausbilder && (
             <button type="button" className="btn" onClick={() => setEditor({ mode: 'create', typ: 'fix', date: defaultDate() })}>
               <Icon name="plus" />
               Neuer Fixtermin
@@ -190,7 +185,7 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
           )}
           <button
             type="button"
-            className={`btn ${auth === 'leiter' ? 'btn-secondary' : ''}`}
+            className={`btn ${ausbilder ? 'btn-secondary' : ''}`}
             onClick={() => setEditor({ mode: 'create', typ: 'individual', date: defaultDate() })}
           >
             <Icon name="plus" />
@@ -202,7 +197,7 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
       <div className="cal-legend">
         <span className="cal-legend-item">
           <span className="cal-swatch cal-fix" />
-          <Icon name="users" size="1em" /> Fixtermin <span className="muted">— gemeinsam, vom Ausbildungsleiter</span>
+          <Icon name="users" size="1em" /> Fixtermin <span className="muted">— gemeinsam, von Ausbildern</span>
         </span>
         <span className="cal-legend-item">
           <span className="cal-swatch cal-individual" />
@@ -232,7 +227,7 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
               key={key}
               role="gridcell"
               className={`cal-day ${inMonth ? '' : 'cal-day-out'} ${key === todayKey ? 'cal-day-today' : ''}`}
-              onClick={() => setEditor({ mode: 'create', typ: auth === 'leiter' ? 'fix' : 'individual', date: key })}
+              onClick={() => setEditor({ mode: 'create', typ: ausbilder ? 'fix' : 'individual', date: key })}
             >
               <div className="cal-day-num num">{day.getDate()}</div>
               {items.map((t) => (
@@ -277,7 +272,7 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
         )}
       </section>
 
-      {auth === 'leiter' && (
+      {ausbilder && (
         <RessourcenPanel
           ressourcen={ressourcen}
           onChange={setRessourcen}
@@ -289,8 +284,8 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
         <TerminEditor
           key={editor.mode === 'edit' ? editor.termin.id : `${editor.typ}-${editor.date}`}
           state={editor}
-          auth={auth}
-          currentTeilnehmerId={currentTeilnehmerId}
+          ausbilder={ausbilder}
+          currentId={currentId}
           personen={personen}
           ressourcen={ressourcen}
           onClose={() => setEditor(null)}
@@ -308,16 +303,16 @@ export function Calendar({ auth, currentTeilnehmerId }: CalendarProps) {
 
 function TerminEditor({
   state,
-  auth,
-  currentTeilnehmerId,
+  ausbilder,
+  currentId,
   personen,
   ressourcen,
   onClose,
   onSaved,
 }: {
   state: NonNullable<EditorState>;
-  auth: Auth;
-  currentTeilnehmerId?: string;
+  ausbilder: boolean;
+  currentId: string;
   personen: KalenderPerson[];
   ressourcen: Ressource[];
   onClose: () => void;
@@ -326,7 +321,7 @@ function TerminEditor({
   const existing = state.mode === 'edit' ? state.termin : null;
   const typ: TerminTyp = existing ? existing.typ : state.mode === 'create' ? state.typ : 'individual';
   const canEdit =
-    !existing || auth === 'leiter' || (existing.typ === 'individual' && existing.createdBy === currentTeilnehmerId);
+    !existing || ausbilder || (existing.typ === 'individual' && existing.createdBy === currentId);
 
   const [titel, setTitel] = useState(existing?.titel ?? (typ === 'fix' ? 'Gemeinsame Übung' : 'Individualübung'));
   const [date, setDate] = useState(
@@ -337,8 +332,9 @@ function TerminEditor({
   const [ressourceId, setRessourceId] = useState(existing?.ressourceId ?? '');
   const [selected, setSelected] = useState<Set<string>>(() => {
     if (existing) return new Set(existing.teilnehmerIds);
-    if (typ === 'fix') return new Set(personen.map((t) => t.id));
-    return new Set(currentTeilnehmerId ? [currentTeilnehmerId] : []);
+    // Fixtermin: every Trupp member; Individualübung: yourself (an Ausbilder plans it for others).
+    if (typ === 'fix') return new Set(personen.filter((p) => p.truppId).map((p) => p.id));
+    return new Set(ausbilder ? [] : [currentId]);
   });
   const [konflikte, setKonflikte] = useState<BuchungsKonflikt[]>([]);
   const [busy, setBusy] = useState(false);
@@ -355,7 +351,6 @@ function TerminEditor({
     const handle = setTimeout(() => {
       api<BuchungsKonflikt[]>('/termine/konflikte', {
         method: 'POST',
-        auth,
         body: {
           ressourceId,
           start: localToIso(date, startTime),
@@ -367,7 +362,7 @@ function TerminEditor({
         .catch(() => setKonflikte([]));
     }, 250);
     return () => clearTimeout(handle);
-  }, [ressourceId, date, startTime, endTime, timesValid, auth, existing?.id]);
+  }, [ressourceId, date, startTime, endTime, timesValid, existing?.id]);
 
   const toggleTn = (id: string) =>
     setSelected((s) => {
@@ -410,7 +405,7 @@ function TerminEditor({
     try {
       const res = await api<TerminSaveResponse>(
         existing ? `/termine/${existing.id}` : '/termine',
-        { method: existing ? 'PUT' : 'POST', auth, body },
+        { method: existing ? 'PUT' : 'POST', body },
       );
       if (res.konflikte.length > 0) {
         alert(
@@ -427,7 +422,7 @@ function TerminEditor({
   const remove = async () => {
     if (!existing || !confirm(`Termin „${existing.titel}" löschen?`)) return;
     try {
-      await api(`/termine/${existing.id}`, { method: 'DELETE', auth });
+      await api(`/termine/${existing.id}`, { method: 'DELETE' });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -436,9 +431,9 @@ function TerminEditor({
 
   const ressourceName = (id: string) => ressourcen.find((r) => r.id === id)?.name ?? 'Ressource';
   const creatorLabel = (createdBy: string) => {
-    if (createdBy === 'ausbildungsleiter') return 'Ausbildungsleiter';
+    if (createdBy === 'ausbildungsleiter') return 'Ausbilder';
     const p = personen.find((t) => t.id === createdBy);
-    return p ? `${p.name} (${p.truppName})` : '—';
+    return p ? `${p.name}${p.truppName ? ` (${p.truppName})` : ''}` : '—';
   };
 
   const heading = existing
@@ -540,14 +535,14 @@ function TerminEditor({
               )}
             </div>
             {personen.length === 0 ? (
-              <p className="muted">Noch keine Teilnehmer in einem Trupp.</p>
+              <p className="muted">Noch keine Personen.</p>
             ) : (
               <div className="cal-tn-list">
                 {gruppen.map((g) => {
                   const ids = g.personen.map((p) => p.id);
                   const count = ids.filter((id) => selected.has(id)).length;
                   return (
-                    <div key={g.truppId} role="group" aria-label={g.truppName}>
+                    <div key={g.key || 'ohne'} role="group" aria-label={g.truppName}>
                       <div className="cal-tn-trupp">
                         <span>
                           {g.truppName}{' '}
@@ -557,7 +552,7 @@ function TerminEditor({
                         </span>
                         {canEdit && (
                           <button type="button" className="btn btn-ghost btn-small" onClick={() => toggleTrupp(ids)}>
-                            {count === ids.length ? 'Abwählen' : 'Ganzen Trupp'}
+                            {count === ids.length ? 'Abwählen' : g.key ? 'Ganzen Trupp' : 'Alle wählen'}
                           </button>
                         )}
                       </div>
@@ -565,11 +560,10 @@ function TerminEditor({
                         <label key={t.id} className="cal-tn">
                           <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleTn(t.id)} />
                           <span>
-                            {t.name} <span className="muted">({t.truppName})</span>
+                            {t.name}
+                            {t.truppName && <span className="muted"> ({t.truppName})</span>}
                           </span>
-                          <span className="muted">
-                            {rolleShort(t.rolle)} · {t.ff}
-                          </span>
+                          <span className="muted">{personDetail(t)}</span>
                         </label>
                       ))}
                     </div>
@@ -603,11 +597,11 @@ function TerminEditor({
   );
 }
 
-// ---------------------------------------------------------------- Ressourcen (Leiter)
+// ---------------------------------------------------------------- Ressourcen (Ausbilder)
 
 /**
  * Ressourcen are instance-wide, so they are managed here in the shared calendar rather than
- * per Trupp. Only the Ausbildungsleiter creates or deletes them.
+ * per Trupp. Only Ausbilder create or delete them.
  */
 function RessourcenPanel({
   ressourcen,
@@ -626,7 +620,7 @@ function RessourcenPanel({
     e.preventDefault();
     setError(null);
     try {
-      const r = await api<Ressource>('/ressourcen', { method: 'POST', auth: 'leiter', body: { name, standort } });
+      const r = await api<Ressource>('/ressourcen', { method: 'POST', body: { name, standort } });
       onChange([...ressourcen, r].sort((a, b) => a.name.localeCompare(b.name, 'de')));
       setName('');
       setStandort('');
@@ -638,7 +632,7 @@ function RessourcenPanel({
   const remove = async (r: Ressource) => {
     if (!confirm(`Ressource „${r.name}" löschen? Bestehende Termine verlieren die Buchung.`)) return;
     try {
-      await api(`/ressourcen/${r.id}`, { method: 'DELETE', auth: 'leiter' });
+      await api(`/ressourcen/${r.id}`, { method: 'DELETE' });
       onChange(ressourcen.filter((x) => x.id !== r.id));
       onRemoved();
     } catch (err) {

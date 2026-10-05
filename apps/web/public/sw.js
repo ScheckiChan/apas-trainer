@@ -7,9 +7,10 @@
  * - Bump CACHE on every change to this file / the shell list: the new worker
  *   activates immediately (skipWaiting + clients.claim) and deletes old caches,
  *   so the update is live on the next reload.
- * - /api/* is never cached.
+ * - /api/* is never intercepted or cached (auth headers, uploads and the Wappen
+ *   image go straight to the network; the Wappen URL carries ?v= for HTTP caching).
  */
-const CACHE = 'apas-trainer-v2';
+const CACHE = 'apas-trainer-v3';
 
 const SHELL = [
   '/',

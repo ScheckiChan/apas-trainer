@@ -1,36 +1,24 @@
-import type { LoginResponse } from '@apas/shared';
+import type { AuthSession, LoginRequest } from '@apas/shared';
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { AuthBrand } from '../components/AuthBrand';
 import { Icon } from '../components/Icon';
-import { api, errorMessage, lastInvite, setToken } from '../lib/api';
+import { api, errorMessage } from '../lib/api';
+import { homePath, useSession } from '../lib/session';
 import './Login.css';
 
-export function Login() {
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const teilnehmerFirst = params.has('teilnehmer');
-
-  return (
-    <main className="auth">
-      <div className="auth-inner">
-        <div className="auth-brand">
-          <img src="/icons/icon-192.png" alt="" width={48} height={48} />
-          <div>
-            <h1>APAS-Trainer</h1>
-            <p>Gemeinsam zur Ausbildungsprüfung Atemschutz — Bronze</p>
-          </div>
-        </div>
-        <div className={`login-cards ${teilnehmerFirst ? 'login-cards-reverse' : ''}`}>
-          <LeiterLogin onSuccess={() => navigate('/trupps', { replace: true })} />
-          <TeilnehmerHint />
-        </div>
-      </div>
-    </main>
-  );
+/** Only internal paths are followed after login (no open redirect). */
+export function weiterNach(state: unknown): string | null {
+  const from = (state as { from?: unknown } | null)?.from;
+  return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && from !== '/login' ? from : null;
 }
 
-function LeiterLogin({ onSuccess }: { onSuccess: () => void }) {
-  const [email, setEmail] = useState('');
+/** One login for every account (Ausbilder, Prüfer, Teilnehmer): Name + Passwort. */
+export function Login() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn } = useSession();
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,79 +28,72 @@ function LeiterLogin({ onSuccess }: { onSuccess: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await api<LoginResponse>('/auth/leiter/login', {
-        method: 'POST',
-        auth: 'none',
-        body: { email, password },
-      });
-      setToken('leiter', res.token);
-      onSuccess();
+      const body: LoginRequest = { name, password };
+      const session = await api<AuthSession>('/auth/login', { method: 'POST', auth: 'none', body });
+      signIn(session);
+      navigate(weiterNach(location.state) ?? homePath(session), { replace: true });
     } catch (err) {
       setError(errorMessage(err));
-    } finally {
       setBusy(false);
     }
   };
 
   return (
-    <form className="card stack" onSubmit={submit}>
-      <h2>Ausbildungsleiter</h2>
-      {error && (
-        <div className="alert alert-error" role="alert">
-          <Icon name="triangle-alert" />
-          <div className="alert-body">{error}</div>
-        </div>
-      )}
-      <div>
-        <div className="field">
-          <label htmlFor="login-email">E-Mail</label>
-          <input
-            id="login-email"
-            type="email"
-            autoComplete="username"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="login-password">Passwort</label>
-          <input
-            id="login-password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+    <main className="auth">
+      <div className="auth-inner">
+        <AuthBrand>
+          <p>Gemeinsam zur Ausbildungsprüfung Atemschutz — Bronze</p>
+        </AuthBrand>
+
+        <form className="card stack auth-form" onSubmit={submit}>
+          <h2>Anmelden</h2>
+          {error && (
+            <div className="alert alert-error" role="alert">
+              <Icon name="triangle-alert" />
+              <div className="alert-body">{error}</div>
+            </div>
+          )}
+          <div>
+            <div className="field">
+              <label htmlFor="login-name">Name</label>
+              <input
+                id="login-name"
+                autoComplete="username"
+                autoCapitalize="words"
+                required
+                minLength={2}
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="login-password">Passwort</label>
+              <input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          </div>
+          <button className="btn" type="submit" disabled={busy} aria-busy={busy}>
+            <Icon name="log-in" />
+            {busy ? 'Anmelden…' : 'Anmelden'}
+          </button>
+        </form>
+
+        <div className="stack">
+          <p className="auth-alt">
+            Noch kein Konto? <Link to="/registrieren">Registrieren</Link>
+          </p>
+          <p className="muted">
+            Hast du einen Einladungslink oder QR-Code von deinem Trupp? Öffne ihn — dort kannst du direkt beitreten.
+          </p>
         </div>
       </div>
-      <button className="btn" type="submit" disabled={busy} aria-busy={busy}>
-        {busy ? 'Anmelden…' : 'Anmelden'}
-      </button>
-    </form>
-  );
-}
-
-/**
- * Teilnehmer accounts belong to one Trupp, so they sign in on that Trupp's invite link
- * (Name + Passwort). The last used link is remembered on this device.
- */
-function TeilnehmerHint() {
-  const invite = lastInvite();
-  return (
-    <section className="card stack">
-      <h2>Teilnehmer</h2>
-      <p className="muted">
-        Öffne den Einladungslink (oder QR-Code) deines Trupps und wähle dort „Anmelden" — mit deinem Namen und
-        Passwort. Neu dabei? Über denselben Link kannst du beitreten.
-      </p>
-      {invite && (
-        <Link className="btn btn-secondary" to={`/join/${encodeURIComponent(invite.token)}?anmelden`}>
-          Anmelden bei „{invite.truppName}"
-          <Icon name="arrow-right" />
-        </Link>
-      )}
-    </section>
+    </main>
   );
 }

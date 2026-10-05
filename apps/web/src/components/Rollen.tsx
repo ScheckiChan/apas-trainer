@@ -7,14 +7,14 @@ import {
   type RolleUpdate,
   type Teilnehmer,
 } from '@apas/shared';
-import { api, type AuthKind } from '../lib/api';
+import { api } from '../lib/api';
 import { Icon } from './Icon';
 import './Rollen.css';
 
-/** PATCH /teilnehmer/:id/rolle — usable by the Ausbildungsleiter and every Teilnehmer of the Trupp. */
-export function saveRolle(teilnehmerId: string, rolle: Rolle | null, auth: Exclude<AuthKind, 'none'>) {
+/** PATCH /teilnehmer/:id/rolle (APAS-Rolle) — usable by Ausbilder and every member of the Trupp. */
+export function saveRolle(teilnehmerId: string, rolle: Rolle | null) {
   const body: RolleUpdate = { rolle };
-  return api<Teilnehmer>(`/teilnehmer/${teilnehmerId}/rolle`, { method: 'PATCH', auth, body });
+  return api<Teilnehmer>(`/teilnehmer/${teilnehmerId}/rolle`, { method: 'PATCH', body });
 }
 
 export function RolleSelect({

@@ -2,54 +2,48 @@ import { ROLLEN, type Trupp, type TruppSummary } from '@apas/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
+import { HauptNav } from '../components/HauptNav';
 import { Icon } from '../components/Icon';
-import { PushButton } from '../components/PushButton';
-import { api, clearToken, errorMessage } from '../lib/api';
+import { api, errorMessage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
+import { useMe } from '../lib/session';
 import './TruppDashboard.css';
 
 /**
- * Landing page of the Ausbildungsleiter: the Trupps of this APAS-Bronze-Ausbildung.
- * Usually just one or a handful — creating another Trupp is a secondary action.
+ * Home of Ausbilder and Prüfer: the Trupps of this APAS-Bronze-Ausbildung.
+ * Ausbilder open a Trupp to manage it (creating another one is a secondary action).
+ * Prüfer only score station runs, so a row takes them straight to that Trupp's Stationen.
  */
 export function TruppDashboard() {
   const navigate = useNavigate();
+  const me = useMe();
+  const ausbilder = me.benutzer.systemRolle === 'ausbilder';
   const [trupps, setTrupps] = useState<TruppSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
-    api<TruppSummary[]>('/trupps', { auth: 'leiter' })
+    api<TruppSummary[]>('/trupps')
       .then(setTrupps)
       .catch((err) => setError(errorMessage(err)));
   }, []);
-
-  const logout = () => {
-    clearToken('leiter');
-    navigate('/login', { replace: true });
-  };
 
   const empty = trupps?.length === 0;
 
   return (
     <>
       <AppHeader>
-        <Link to="/kalender" className="btn btn-ghost btn-small" title="Kalender">
-          <Icon name="calendar-days" />
-          <span className="hide-sm">Kalender</span>
-        </Link>
-        <Link to="/rangliste" className="btn btn-ghost btn-small" title="Rangliste">
-          <Icon name="trophy" />
-          <span className="hide-sm">Rangliste</span>
-        </Link>
-        <PushButton auth="leiter" />
-        <button type="button" className="btn btn-ghost btn-small" onClick={logout} title="Abmelden">
-          <Icon name="log-out" />
-          <span className="hide-sm">Abmelden</span>
-        </button>
+        <HauptNav />
       </AppHeader>
       <main className="page stack">
-        <h1>Trupps</h1>
+        <div>
+          <h1>Trupps</h1>
+          {!ausbilder && (
+            <p className="muted">
+              Wähle einen Trupp, um an einer Station die Zeit zu nehmen und das Ergebnis zu speichern.
+            </p>
+          )}
+        </div>
 
         {error && (
           <div className="alert alert-error">
@@ -58,7 +52,7 @@ export function TruppDashboard() {
           </div>
         )}
         {trupps === null && !error && <p className="muted">Lade…</p>}
-        {empty && <p className="muted">Noch kein Trupp angelegt.</p>}
+        {empty && <p className="muted">{ausbilder ? 'Noch kein Trupp angelegt.' : 'Es gibt noch keinen Trupp.'}</p>}
 
         {trupps && trupps.length > 0 && (
           <div className="tl">
@@ -72,14 +66,15 @@ export function TruppDashboard() {
             <ul className="tl-list">
               {trupps.map((t) => (
                 <li key={t.id}>
-                  <TruppRow trupp={t} />
+                  <TruppRow trupp={t} to={ausbilder ? `/trupps/${t.id}` : `/trupps/${t.id}/stationen`} />
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        {trupps !== null &&
+        {ausbilder &&
+          trupps !== null &&
           (showCreate || empty ? (
             <CreateTrupp
               onCancel={empty ? undefined : () => setShowCreate(false)}
@@ -92,19 +87,18 @@ export function TruppDashboard() {
                 Neuen Trupp erstellen
               </button>
             </div>
-          ))}
-      </main>
+          ))}      </main>
     </>
   );
 }
 
 /** One table row with the real counts inline. Collapses to three lines on phones. */
-function TruppRow({ trupp: t }: { trupp: TruppSummary }) {
+function TruppRow({ trupp: t, to }: { trupp: TruppSummary; to: string }) {
   const days = t.pruefungstermin ? daysUntil(t.pruefungstermin) : null;
   const urgent = days !== null && days >= 0 && days <= 14;
   const rollenKomplett = t.rollenBesetzt === ROLLEN.length;
   return (
-    <Link to={`/trupps/${t.id}`} className="tl-row">
+    <Link to={to} className="tl-row">
       <span className="tl-name">{t.name}</span>
       <span className="tl-stats">
         <span className={`tl-cell ${rollenKomplett ? 'tl-ok' : 'tl-warn'}`}>
@@ -145,7 +139,6 @@ function CreateTrupp({ onCreated, onCancel }: { onCreated: (t: Trupp) => void; o
     try {
       const t = await api<Trupp>('/trupps', {
         method: 'POST',
-        auth: 'leiter',
         body: { name, pruefungstermin: pruefungstermin || null },
       });
       onCreated(t);

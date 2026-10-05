@@ -1,26 +1,45 @@
 import type { ApiError } from '@apas/shared';
 
 /**
- * Two independent sessions can live on one device (e.g. an Ausbildungsleiter who
- * also tests the Teilnehmer view). Each request states explicitly which token it uses.
+ * One account, one token per device. `auth: 'auth'` sends it, `'none'` doesn't (public
+ * endpoints, login, registration). What the account may do is never read from the token —
+ * the session (lib/session.tsx) always asks GET /auth/me.
  */
-export type AuthKind = 'leiter' | 'teilnehmer' | 'none';
+export type AuthKind = 'auth' | 'none';
 
-const TOKEN_KEYS: Record<Exclude<AuthKind, 'none'>, string> = {
-  leiter: 'apas.leiterToken',
-  teilnehmer: 'apas.teilnehmerToken',
-};
+const TOKEN_KEY = 'apas.token';
 
-export function getToken(kind: Exclude<AuthKind, 'none'>): string | null {
-  return localStorage.getItem(TOKEN_KEYS[kind]);
+/**
+ * Before the unified accounts a device could hold a Leiter and a Teilnehmer token side by
+ * side. The API still accepts both, so the first load keeps one of them (the Leiter one wins,
+ * matching the old "Leiter session wins" rule) and drops the old keys.
+ */
+const LEGACY_TOKEN_KEYS = ['apas.leiterToken', 'apas.teilnehmerToken'] as const;
+
+function migrateLegacyToken(): void {
+  try {
+    if (!localStorage.getItem(TOKEN_KEY)) {
+      const legacy = LEGACY_TOKEN_KEYS.map((k) => localStorage.getItem(k)).find((t) => !!t);
+      if (legacy) localStorage.setItem(TOKEN_KEY, legacy);
+    }
+    for (const k of LEGACY_TOKEN_KEYS) localStorage.removeItem(k);
+  } catch {
+    // Storage unavailable (private mode) — nothing to migrate.
+  }
 }
 
-export function setToken(kind: Exclude<AuthKind, 'none'>, token: string): void {
-  localStorage.setItem(TOKEN_KEYS[kind], token);
+migrateLegacyToken();
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
 }
 
-export function clearToken(kind: Exclude<AuthKind, 'none'>): void {
-  localStorage.removeItem(TOKEN_KEYS[kind]);
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 export class HttpError extends Error {
@@ -33,33 +52,48 @@ export class HttpError extends Error {
   }
 }
 
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
+export const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
 
-export async function api<T>(
-  path: string,
-  opts: { method?: string; body?: unknown; auth: AuthKind },
-): Promise<T> {
+/** Absolute URL of an API path (e.g. for <img src>), same prefix api() uses. */
+export const apiUrl = (path: string): string => `${API_BASE}/api${path}`;
+
+export interface ApiOptions {
+  method?: string;
+  /** JSON body. */
+  body?: unknown;
+  /** Raw body (e.g. an uploaded file), sent as-is with its own type as Content-Type. */
+  raw?: Blob;
+  /** Defaults to 'auth'. */
+  auth?: AuthKind;
+}
+
+export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
+  const auth = opts.auth ?? 'auth';
   const headers: Record<string, string> = {};
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (opts.auth !== 'none') {
-    const token = getToken(opts.auth);
+  let body: BodyInit | undefined;
+  if (opts.raw !== undefined) {
+    headers['Content-Type'] = opts.raw.type || 'application/octet-stream';
+    body = opts.raw;
+  } else if (opts.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(opts.body);
+  }
+  if (auth === 'auth') {
+    const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api${path}`, {
-      method: opts.method ?? 'GET',
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    });
+    res = await fetch(apiUrl(path), { method: opts.method ?? 'GET', headers, body });
   } catch {
     throw new HttpError(0, 'Keine Verbindung zum Server — bist du offline?');
   }
 
-  if (res.status === 401 && opts.auth !== 'none') {
-    clearToken(opts.auth);
-    window.dispatchEvent(new CustomEvent('apas:unauthorized', { detail: opts.auth }));
+  // Expired / revoked token or deleted account → back to the login (see App + session).
+  if (res.status === 401 && auth === 'auth') {
+    clearToken();
+    window.dispatchEvent(new CustomEvent('apas:unauthorized'));
   }
 
   if (res.status === 204) return undefined as T;
@@ -75,8 +109,8 @@ export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : 'Unbekannter Fehler';
 
 /**
- * Teilnehmer log in via their Trupp's invite link (identity = Trupp + Name). The last
- * used link is remembered so the Login page can send returning Teilnehmer back to it.
+ * The last invite link used on this device — the Join page opens on "Anmelden" when the
+ * same link is opened again.
  */
 export interface LastInvite {
   token: string;

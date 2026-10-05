@@ -12,7 +12,7 @@ import { AppHeader } from '../components/AppHeader';
 import { Icon } from '../components/Icon';
 import { BestandenBadge } from '../components/StationLauf';
 import { stationById } from '../content/stations';
-import { api, errorMessage, getToken } from '../lib/api';
+import { api, errorMessage } from '../lib/api';
 import { formatDateTime, formatStoppuhr, formatTime } from '../lib/format';
 import './Rangliste.css';
 
@@ -20,11 +20,10 @@ const REFRESH_MS = 30_000;
 
 /**
  * Per-station leaderboards, meant to be glanced at (or projected) during a training session:
- * one station at a time, Trupps ranked by Zeit. Visible to every signed-in Ausbildungsleiter
- * or Teilnehmer. Refreshes itself.
+ * one station at a time, Trupps ranked by Zeit. Visible to every signed-in account.
+ * Refreshes itself.
  */
 export function Rangliste() {
-  const auth = getToken('leiter') ? 'leiter' : 'teilnehmer';
   const [listen, setListen] = useState<StationRangliste[] | null>(null);
   const [stand, setStand] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,14 +36,14 @@ export function Rangliste() {
     setSearchParams(id === STATION_IDS[0] ? {} : { station: id }, { replace: true });
 
   const load = useCallback(() => {
-    api<StationRangliste[]>('/rangliste', { auth })
+    api<StationRangliste[]>('/rangliste')
       .then((r) => {
         setListen(r);
         setStand(new Date());
         setError(null);
       })
       .catch((err) => setError(errorMessage(err)));
-  }, [auth]);
+  }, []);
 
   useEffect(() => {
     load();

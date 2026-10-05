@@ -196,8 +196,9 @@ export function LaufLeiste({ lauf }: { lauf: Lauf }) {
 }
 
 /**
- * Leiter-only: stores this run as the Trupp's latest result for the station (replaces the
- * previous one). Stops the clocks so the saved time matches what is shown.
+ * Stores this run as the Trupp's latest result for the station (replaces the previous one).
+ * Shown only when kannErgebnisSpeichern allows it (Ausbilder / Prüfer: any Trupp, Teilnehmer:
+ * their own). Stops the clocks so the saved time matches what is shown.
  */
 export function ErgebnisSpeichern({ station, truppId, lauf }: { station: Station; truppId: string; lauf: Lauf }) {
   const [trupp, setTrupp] = useState<Trupp | null>(null);
@@ -208,8 +209,8 @@ export function ErgebnisSpeichern({ station, truppId, lauf }: { station: Station
 
   useEffect(() => {
     Promise.all([
-      api<Trupp>(`/trupps/${truppId}`, { auth: 'leiter' }),
-      api<StationErgebnis[]>(`/trupps/${truppId}/ergebnisse`, { auth: 'leiter' }),
+      api<Trupp>(`/trupps/${truppId}`),
+      api<StationErgebnis[]>(`/trupps/${truppId}/ergebnisse`),
     ])
       .then(([tr, list]) => {
         setTrupp(tr);
@@ -235,7 +236,6 @@ export function ErgebnisSpeichern({ station, truppId, lauf }: { station: Station
     try {
       const saved = await api<StationErgebnis>(`/trupps/${truppId}/ergebnisse/${station.id}`, {
         method: 'PUT',
-        auth: 'leiter',
         body,
       });
       setGespeichert(saved);

@@ -117,30 +117,8 @@
   margin-bottom: var(--space-3);
 }
 
-.gd-add-result {
+.gd-add > .alert {
   margin-bottom: var(--space-3);
-}
-
-.gd-add-body {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.gd-temp-pw {
-  font-family: var(--font-sans);
-  font-size: var(--text-xl);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  padding: var(--space-1) var(--space-3);
-  user-select: all;
-  overflow-wrap: anywhere;
 }
 
 .gd-add-form {
@@ -148,6 +126,15 @@
   grid-template-columns: 1fr 1fr auto;
   gap: var(--space-2);
   align-items: center;
+}
+
+.gd-add-form-pick {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.gd-add-intro {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .gd-add-error {

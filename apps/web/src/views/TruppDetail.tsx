@@ -1,16 +1,21 @@
 import {
   checklistAmpel,
+  SYSTEM_ROLLE_LABELS,
+  type BenutzerUebersicht,
   type ChecklistItem,
   type Trupp,
   type Rolle,
   type Teilnehmer,
+  type TeilnehmerCreateRequest,
   type TeilnehmerCreateResponse,
+  type TeilnehmerZuordnenRequest,
 } from '@apas/shared';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
+import { EinmalPasswort } from '../components/EinmalPasswort';
 import { Icon } from '../components/Icon';
 import { RolleSelect, RollenAbdeckung, saveRolle } from '../components/Rollen';
 import { api, errorMessage } from '../lib/api';
@@ -26,8 +31,8 @@ export function TruppDetail() {
   const load = useCallback(async () => {
     try {
       const [tr, t] = await Promise.all([
-        api<Trupp>(`/trupps/${truppId}`, { auth: 'leiter' }),
-        api<Teilnehmer[]>(`/trupps/${truppId}/teilnehmer`, { auth: 'leiter' }),
+        api<Trupp>(`/trupps/${truppId}`),
+        api<Teilnehmer[]>(`/trupps/${truppId}/teilnehmer`),
       ]);
       setTrupp(tr);
       setTeilnehmer(t);
@@ -45,7 +50,6 @@ export function TruppDetail() {
     try {
       const updated = await api<Teilnehmer>(`/trupps/${truppId}/teilnehmer/${t.id}/checkliste`, {
         method: 'PATCH',
-        auth: 'leiter',
         body: { [item]: next },
       });
       setTeilnehmer((list) => list.map((x) => (x.id === updated.id ? updated : x)));
@@ -56,7 +60,7 @@ export function TruppDetail() {
 
   const changeRolle = async (t: Teilnehmer, rolle: Rolle | null) => {
     try {
-      const updated = await saveRolle(t.id, rolle, 'leiter');
+      const updated = await saveRolle(t.id, rolle);
       setTeilnehmer((list) => list.map((x) => (x.id === updated.id ? updated : x)));
     } catch (err) {
       alert(errorMessage(err));
@@ -64,9 +68,16 @@ export function TruppDetail() {
   };
 
   const remove = async (t: Teilnehmer) => {
-    if (!confirm(`${t.name} aus dem Trupp entfernen?`)) return;
+    if (
+      !confirm(
+        `${t.name} aus dem Trupp „${trupp?.name ?? ''}" entfernen?\n\n` +
+          'Das Konto bleibt bestehen und kann später wieder einem Trupp zugeordnet werden. ' +
+          'Die Rolle in diesem Trupp wird zurückgesetzt.',
+      )
+    )
+      return;
     try {
-      await api(`/trupps/${truppId}/teilnehmer/${t.id}`, { method: 'DELETE', auth: 'leiter' });
+      await api(`/trupps/${truppId}/teilnehmer/${t.id}`, { method: 'DELETE' });
       setTeilnehmer((list) => list.filter((x) => x.id !== t.id));
     } catch (err) {
       alert(errorMessage(err));
@@ -156,8 +167,11 @@ export function TruppDetail() {
                 <li key={t.id} className="gd-tn">
                   <AmpelDot teilnehmer={t} />
                   <div className="gd-tn-main">
-                    <div className="gd-tn-name">{t.name}</div>
-                    <div className="muted">{t.ff}</div>
+                    <div className="gd-tn-name">
+                      {t.name}
+                      {t.systemRolle !== 'teilnehmer' && <span className="badge">{SYSTEM_ROLLE_LABELS[t.systemRolle]}</span>}
+                    </div>
+                    {t.ff && <div className="muted">{t.ff}</div>}
                   </div>
                   <RolleSelect teilnehmer={t} onChange={(rolle) => changeRolle(t, rolle)} />
                   <ChecklistToggles teilnehmer={t} compact onToggle={(item) => toggle(t, item)} />
@@ -165,8 +179,8 @@ export function TruppDetail() {
                     type="button"
                     className="btn btn-ghost btn-icon gd-remove"
                     onClick={() => remove(t)}
-                    title="Aus dem Trupp entfernen"
-                    aria-label={`${t.name} entfernen`}
+                    title="Aus dem Trupp entfernen (Konto bleibt bestehen)"
+                    aria-label={`${t.name} aus dem Trupp entfernen`}
                   >
                     <Icon name="trash-2" />
                   </button>
@@ -185,125 +199,223 @@ export function TruppDetail() {
   );
 }
 
+type AddMode = 'neu' | 'bestehend';
+
 /**
- * Direct add without the invite link (e.g. pre-populating a Trupp). The generated password
- * is only in the API response, so it is shown exactly once here.
+ * "Person hinzufügen" without the invite link: either a new account with a generated
+ * password (shown exactly once — it's only in the API response), or an already registered
+ * account that isn't in any Trupp yet.
  */
 function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Teilnehmer) => void }) {
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<AddMode | null>(null);
+  const [created, setCreated] = useState<TeilnehmerCreateResponse | null>(null);
+  const [zugeordnet, setZugeordnet] = useState<string | null>(null);
+
+  const open = (m: AddMode) => {
+    setMode(m);
+    setCreated(null);
+    setZugeordnet(null);
+  };
+
+  return (
+    <div className="gd-add">
+      {created && (
+        <EinmalPasswort password={created.tempPassword} onClose={() => setCreated(null)}>
+          <strong>{created.teilnehmer.name}</strong> wurde hinzugefügt.
+        </EinmalPasswort>
+      )}
+      {zugeordnet && (
+        <div className="alert alert-ok" role="status">
+          <Icon name="circle-check" />
+          <div className="alert-body">
+            <strong>{zugeordnet}</strong> ist jetzt in diesem Trupp und meldet sich mit dem eigenen Passwort an.
+          </div>
+        </div>
+      )}
+      {mode === 'neu' ? (
+        <NeuesKonto
+          truppId={truppId}
+          onCancel={() => setMode(null)}
+          onCreated={(res) => {
+            onAdded(res.teilnehmer);
+            setCreated(res);
+            setMode(null);
+          }}
+        />
+      ) : mode === 'bestehend' ? (
+        <BestehendesKonto
+          truppId={truppId}
+          onCancel={() => setMode(null)}
+          onAssigned={(t) => {
+            onAdded(t);
+            setZugeordnet(t.name);
+            setMode(null);
+          }}
+        />
+      ) : (
+        <div className="btn-row">
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => open('neu')}>
+            <Icon name="user-plus" />
+            Person hinzufügen
+          </button>
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => open('bestehend')}>
+            <Icon name="user-round-check" />
+            Bestehendes Konto zuordnen
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NeuesKonto({
+  truppId,
+  onCreated,
+  onCancel,
+}: {
+  truppId: string;
+  onCreated: (res: TeilnehmerCreateResponse) => void;
+  onCancel: () => void;
+}) {
   const [name, setName] = useState('');
   const [ff, setFf] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<TeilnehmerCreateResponse | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const res = await api<TeilnehmerCreateResponse>(`/trupps/${truppId}/teilnehmer`, {
-        method: 'POST',
-        auth: 'leiter',
-        body: { name, ff },
-      });
-      onAdded(res.teilnehmer);
-      setCreated(res);
-      setCopied(false);
-      setName('');
-      setOpen(false);
+      const body: TeilnehmerCreateRequest = { name, ff: ff.trim() || null };
+      onCreated(await api<TeilnehmerCreateResponse>(`/trupps/${truppId}/teilnehmer`, { method: 'POST', body }));
     } catch (err) {
       setError(errorMessage(err));
-    } finally {
       setBusy(false);
     }
   };
 
-  const copy = async () => {
-    if (!created) return;
+  return (
+    <form className="gd-add-form" onSubmit={submit} aria-label="Neues Konto anlegen">
+      <p className="muted gd-add-intro">Neues Konto mit einmaligem Passwort anlegen.</p>
+      {error && (
+        <div className="alert alert-error gd-add-error" role="alert">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{error}</div>
+        </div>
+      )}
+      <input
+        required
+        minLength={2}
+        maxLength={100}
+        placeholder="Name, z. B. Max Mustermann"
+        aria-label="Name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        autoFocus
+      />
+      <input
+        minLength={2}
+        maxLength={100}
+        placeholder="FF (optional), z. B. FF Fels"
+        aria-label="Feuerwehr (optional)"
+        value={ff}
+        onChange={(e) => setFf(e.target.value)}
+      />
+      <div className="btn-row">
+        <button className="btn" type="submit" disabled={busy} aria-busy={busy}>
+          {busy ? 'Füge hinzu…' : 'Hinzufügen'}
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={onCancel}>
+          Abbrechen
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Picker fed by GET /benutzer/ohne-trupp — e.g. people who registered themselves. */
+function BestehendesKonto({
+  truppId,
+  onAssigned,
+  onCancel,
+}: {
+  truppId: string;
+  onAssigned: (t: Teilnehmer) => void;
+  onCancel: () => void;
+}) {
+  const [konten, setKonten] = useState<BenutzerUebersicht[] | null>(null);
+  const [benutzerId, setBenutzerId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<BenutzerUebersicht[]>('/benutzer/ohne-trupp')
+      .then(setKonten)
+      .catch((err) => setError(errorMessage(err)));
+  }, []);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!benutzerId) return;
+    setBusy(true);
+    setError(null);
     try {
-      await navigator.clipboard.writeText(created.tempPassword);
-      setCopied(true);
-    } catch {
-      prompt('Passwort kopieren:', created.tempPassword);
+      const body: TeilnehmerZuordnenRequest = { benutzerId };
+      onAssigned(await api<Teilnehmer>(`/trupps/${truppId}/teilnehmer/zuordnen`, { method: 'POST', body }));
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
     }
   };
 
+  const label = (b: BenutzerUebersicht) =>
+    [b.name, b.ff, b.systemRolle !== 'teilnehmer' ? SYSTEM_ROLLE_LABELS[b.systemRolle] : null]
+      .filter(Boolean)
+      .join(' · ');
+
   return (
-    <div className="gd-add">
-      {created && (
-        <div className="alert alert-ok gd-add-result" role="status">
-          <Icon name="circle-check" />
-          <div className="alert-body gd-add-body">
-            <div>
-              <strong>{created.teilnehmer.name}</strong> wurde hinzugefügt. Einmaliges Passwort — jetzt weitergeben,
-              es wird nicht erneut angezeigt:
-            </div>
-            <code className="gd-temp-pw">{created.tempPassword}</code>
-            <div className="muted">Anmeldung über den Einladungslink → „Anmelden" mit Name + Passwort.</div>
-            <div className="btn-row">
-              <button type="button" className="btn btn-secondary btn-small" onClick={copy}>
-                <Icon name={copied ? 'check' : 'copy'} />
-                {copied ? 'Kopiert' : 'Passwort kopieren'}
-              </button>
-              <button type="button" className="btn btn-ghost btn-small" onClick={() => setCreated(null)}>
-                Schließen
-              </button>
-            </div>
-          </div>
+    <form className="gd-add-form gd-add-form-pick" onSubmit={submit} aria-label="Bestehendes Konto zuordnen">
+      <p className="muted gd-add-intro">
+        Konten ohne Trupp — z. B. Personen, die sich selbst registriert haben. Sie behalten ihr Passwort.
+      </p>
+      {error && (
+        <div className="alert alert-error gd-add-error" role="alert">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{error}</div>
         </div>
       )}
-      {open ? (
-        <form className="gd-add-form" onSubmit={submit}>
-          {error && (
-            <div className="alert alert-error gd-add-error">
-              <Icon name="triangle-alert" />
-              <div className="alert-body">{error}</div>
-            </div>
-          )}
-          <input
-            required
-            minLength={2}
-            maxLength={100}
-            placeholder="Name, z. B. Max Mustermann"
-            aria-label="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-          <input
-            required
-            minLength={2}
-            maxLength={100}
-            placeholder="FF, z. B. FF Fels"
-            aria-label="Feuerwehr"
-            value={ff}
-            onChange={(e) => setFf(e.target.value)}
-          />
-          <div className="btn-row">
-            <button className="btn" type="submit" disabled={busy} aria-busy={busy}>
-              {busy ? 'Füge hinzu…' : 'Hinzufügen'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => {
-                setOpen(false);
-                setError(null);
-              }}
-            >
-              Abbrechen
-            </button>
-          </div>
-        </form>
+      {konten === null ? (
+        !error && <p className="muted gd-add-intro">Lade…</p>
+      ) : konten.length === 0 ? (
+        <p className="gd-add-intro">Gerade gibt es kein Konto ohne Trupp.</p>
       ) : (
-        <button type="button" className="btn btn-secondary btn-small" onClick={() => setOpen(true)}>
-          <Icon name="user-plus" />
-          Person hinzufügen
-        </button>
+        <select
+          required
+          aria-label="Konto"
+          value={benutzerId}
+          onChange={(e) => setBenutzerId(e.target.value)}
+          autoFocus
+        >
+          <option value="">— Konto wählen ({konten.length}) —</option>
+          {konten.map((b) => (
+            <option key={b.id} value={b.id}>
+              {label(b)}
+            </option>
+          ))}
+        </select>
       )}
-    </div>
+      <div className="btn-row">
+        {konten && konten.length > 0 && (
+          <button className="btn" type="submit" disabled={busy || !benutzerId} aria-busy={busy}>
+            {busy ? 'Ordne zu…' : 'Zuordnen'}
+          </button>
+        )}
+        <button type="button" className="btn btn-ghost" onClick={onCancel}>
+          {konten && konten.length === 0 ? 'Schließen' : 'Abbrechen'}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -320,7 +432,6 @@ function PruefungsterminEditor({ trupp, onSaved }: { trupp: Trupp; onSaved: (tru
     try {
       const updated = await api<Trupp>(`/trupps/${trupp.id}`, {
         method: 'PATCH',
-        auth: 'leiter',
         body: { pruefungstermin: value || null },
       });
       onSaved(updated);
@@ -384,7 +495,7 @@ function InvitePanel({ trupp, onRegenerated }: { trupp: Trupp; onRegenerated: (t
   const regenerate = async () => {
     if (!confirm('Neuen Einladungslink erzeugen? Der bisherige Link funktioniert danach nicht mehr.')) return;
     try {
-      onRegenerated(await api<Trupp>(`/trupps/${trupp.id}/invite/regenerate`, { method: 'POST', auth: 'leiter' }));
+      onRegenerated(await api<Trupp>(`/trupps/${trupp.id}/invite/regenerate`, { method: 'POST' }));
     } catch (err) {
       alert(errorMessage(err));
     }
