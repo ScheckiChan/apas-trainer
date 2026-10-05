@@ -3,7 +3,7 @@ import {
   checklistAmpel,
   isChecklistItemRequired,
   type ChecklistItem,
-  type Gruppe,
+  type Trupp,
   type Rolle,
   type Teilnehmer,
 } from '@apas/shared';
@@ -19,14 +19,14 @@ import { Calendar } from './Calendar';
 import { Stations } from './Stations';
 import './TeilnehmerView.css';
 
-const TABS = ['checkliste', 'gruppe', 'kalender', 'stationen'] as const;
+const TABS = ['checkliste', 'trupp', 'kalender', 'stationen'] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (v: string | null): v is Tab => TABS.includes(v as Tab);
 
 export function TeilnehmerView() {
   const navigate = useNavigate();
   const [me, setMe] = useState<Teilnehmer | null>(null);
-  const [gruppe, setGruppe] = useState<Gruppe | null>(null);
+  const [trupp, setTrupp] = useState<Trupp | null>(null);
   const [error, setError] = useState<string | null>(null);
   // ?tab= so the station detail pages can link back to the Stationen tab.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,10 +35,10 @@ export function TeilnehmerView() {
   const setTab = (t: Tab) => setSearchParams(t === 'checkliste' ? {} : { tab: t }, { replace: true });
 
   useEffect(() => {
-    api<{ teilnehmer: Teilnehmer; gruppe: Gruppe }>('/auth/teilnehmer/me', { auth: 'teilnehmer' })
+    api<{ teilnehmer: Teilnehmer; trupp: Trupp }>('/auth/teilnehmer/me', { auth: 'teilnehmer' })
       .then((r) => {
         setMe(r.teilnehmer);
-        setGruppe(r.gruppe);
+        setTrupp(r.trupp);
       })
       .catch((err) => setError(errorMessage(err)));
   }, []);
@@ -47,7 +47,7 @@ export function TeilnehmerView() {
     if (!me) return;
     const next = me.checkliste[item] === 'ok' ? 'offen' : 'ok';
     try {
-      const updated = await api<Teilnehmer>(`/gruppen/${me.gruppeId}/teilnehmer/${me.id}/checkliste`, {
+      const updated = await api<Teilnehmer>(`/trupps/${me.truppId}/teilnehmer/${me.id}/checkliste`, {
         method: 'PATCH',
         auth: 'teilnehmer',
         body: { [item]: next },
@@ -84,21 +84,21 @@ export function TeilnehmerView() {
       </AppHeader>
       <main className="page stack">
         {error && <div className="alert alert-error">{error}</div>}
-        {!me || !gruppe ? (
+        {!me || !trupp ? (
           !error && <p className="muted">Lade…</p>
         ) : (
           <>
             <section className="tv-hero">
               <div>
                 <div className="tv-hello">Servus, {me.name.split(' ')[0]}!</div>
-                <h1>{gruppe.name}</h1>
+                <h1>{trupp.name}</h1>
                 <div className="tv-meta">
                   {me.ff} · {rolleLabel(me.rolle)}
                 </div>
               </div>
               <div className="tv-countdown">
-                <strong>{countdownLabel(gruppe.pruefungstermin)}</strong>
-                {gruppe.pruefungstermin && <span>Prüfung am {formatDate(gruppe.pruefungstermin)}</span>}
+                <strong>{countdownLabel(trupp.pruefungstermin)}</strong>
+                {trupp.pruefungstermin && <span>Prüfung am {formatDate(trupp.pruefungstermin)}</span>}
               </div>
             </section>
 
@@ -106,7 +106,7 @@ export function TeilnehmerView() {
               {(
                 [
                   ['checkliste', 'Checkliste'],
-                  ['gruppe', 'Gruppe'],
+                  ['trupp', 'Trupp'],
                   ['kalender', 'Kalender'],
                   ['stationen', 'Stationen'],
                 ] as const
@@ -139,7 +139,7 @@ export function TeilnehmerView() {
                 )}
                 {!me.rolle && (
                   <p className="muted">
-                    Du hast noch keine Rolle. Die Rollen werden gemeinsam eingeteilt — im Tab „Gruppe".
+                    Du hast noch keine Rolle. Die Rollen werden gemeinsam eingeteilt — im Tab „Trupp".
                   </p>
                 )}
                 {checklistAmpel(me.rolle, me.checkliste) === 'gruen' && (
@@ -148,9 +148,9 @@ export function TeilnehmerView() {
               </section>
             )}
 
-            {tab === 'gruppe' && <GruppeTab me={me} onRolleChange={changeRolle} />}
+            {tab === 'trupp' && <TruppTab me={me} onRolleChange={changeRolle} />}
 
-            {tab === 'kalender' && <Calendar gruppeId={gruppe.id} auth="teilnehmer" currentTeilnehmerId={me.id} />}
+            {tab === 'kalender' && <Calendar truppId={trupp.id} auth="teilnehmer" currentTeilnehmerId={me.id} />}
 
             {tab === 'stationen' && <Stations basePath="/teilnehmer/stationen" />}
           </>
@@ -161,10 +161,10 @@ export function TeilnehmerView() {
 }
 
 /**
- * Everyone in the Gruppe with their Ampel and Rolle. Role shuffling before the exam is a
- * group decision, so every Teilnehmer can change any Rolle here; checklists stay read-only.
+ * Everyone in the Trupp with their Ampel and Rolle. Role shuffling before the exam is a
+ * joint decision, so every Teilnehmer can change any Rolle here; checklists stay read-only.
  */
-function GruppeTab({
+function TruppTab({
   me,
   onRolleChange,
 }: {
@@ -175,10 +175,10 @@ function GruppeTab({
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    api<Teilnehmer[]>(`/gruppen/${me.gruppeId}/teilnehmer`, { auth: 'teilnehmer' })
+    api<Teilnehmer[]>(`/trupps/${me.truppId}/teilnehmer`, { auth: 'teilnehmer' })
       .then(setList)
       .catch((err) => setError(errorMessage(err)));
-  }, [me.gruppeId]);
+  }, [me.truppId]);
 
   useEffect(load, [load]);
 
@@ -192,7 +192,7 @@ function GruppeTab({
 
   return (
     <section className="card stack">
-      <h2>Gruppe &amp; Rollen</h2>
+      <h2>Trupp &amp; Rollen</h2>
       <p className="muted">
         Die Rollen könnt ihr jederzeit gemeinsam umstellen — jede Rolle darf auch mehrfach besetzt sein
         (Ergänzungsteilnehmer).

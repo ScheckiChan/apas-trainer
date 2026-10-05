@@ -1,8 +1,10 @@
 import { createApp } from './app.js';
 import { config } from './config.js';
+import { migrateGruppeToTrupp } from './migrate.js';
 import { initPush } from './push.js';
 import { startReminderLoop, stopReminderLoop } from './reminders.js';
 
+migrateGruppeToTrupp(config.dataDir);
 initPush();
 
 const server = createApp().listen(config.port, () => {

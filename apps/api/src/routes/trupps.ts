@@ -1,32 +1,34 @@
-import { checklistAmpel, type GruppeSummary, type TeilnehmerCreateResponse } from '@apas/shared';
+import { checklistAmpel, ROLLEN, rollenBesetzung, type TruppSummary, type TeilnehmerCreateResponse } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
-import { db, type GruppeRecord, type RessourceRecord } from '../db.js';
-import { isOwner, loadGruppeForPrincipal, requireAny, requireLeiter } from '../lib/auth.js';
+import { db, type TruppRecord, type RessourceRecord } from '../db.js';
+import { isOwner, loadTruppForPrincipal, requireAny, requireLeiter } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId, randomToken } from '../lib/ids.js';
 import { generateTempPassword, hashPassword } from '../lib/password.js';
 import { ffSchema, findByName, nameSchema, newTeilnehmerRecord } from '../lib/teilnehmer.js';
 import { removeSubscriptionsOf } from '../push.js';
-import { toGruppe, toRessource, toTeilnehmer } from '../serialize.js';
+import { toTrupp, toRessource, toTeilnehmer } from '../serialize.js';
 
-export const gruppenRouter = Router();
+export const truppsRouter = Router();
 
 const isoDate = z.iso.date();
 
-// ---------------------------------------------------------------- Gruppen (Ausbildungsleiter)
+// ---------------------------------------------------------------- Trupps (Ausbildungsleiter)
 
-gruppenRouter.get('/', requireLeiter, async (req, res) => {
-  const gruppen = await db.gruppen.find((g) => g.ownerId === req.leiter!.sub);
+truppsRouter.get('/', requireLeiter, async (req, res) => {
+  const trupps = await db.trupps.find((trupp) => trupp.ownerId === req.leiter!.sub);
   const teilnehmer = await db.teilnehmer.all();
-  const body: GruppeSummary[] = gruppen
+  const body: TruppSummary[] = trupps
     .sort((a, b) => (a.pruefungstermin ?? '9999').localeCompare(b.pruefungstermin ?? '9999'))
-    .map((g) => {
-      const members = teilnehmer.filter((t) => t.gruppeId === g.id);
+    .map((trupp) => {
+      const members = teilnehmer.filter((t) => t.truppId === trupp.id);
+      const besetzung = rollenBesetzung(members);
       return {
-        ...toGruppe(g, { includeInvite: true }),
+        ...toTrupp(trupp, { includeInvite: true }),
         teilnehmerCount: members.length,
         bereitCount: members.filter((t) => checklistAmpel(t.rolle, t.checkliste) === 'gruen').length,
+        rollenBesetzt: ROLLEN.filter((r) => besetzung[r] > 0).length,
       };
     });
   res.json(body);
@@ -37,9 +39,9 @@ const createSchema = z.object({
   pruefungstermin: isoDate.nullish(),
 });
 
-gruppenRouter.post('/', requireLeiter, async (req, res) => {
+truppsRouter.post('/', requireLeiter, async (req, res) => {
   const input = parseBody(createSchema, req);
-  const rec: GruppeRecord = {
+  const rec: TruppRecord = {
     id: newId(),
     name: input.name,
     stufe: 'BRONZE',
@@ -48,13 +50,13 @@ gruppenRouter.post('/', requireLeiter, async (req, res) => {
     inviteToken: randomToken(),
     createdAt: new Date().toISOString(),
   };
-  await db.gruppen.insert(rec);
-  res.status(201).json(toGruppe(rec, { includeInvite: true }));
+  await db.trupps.insert(rec);
+  res.status(201).json(toTrupp(rec, { includeInvite: true }));
 });
 
-gruppenRouter.get('/:gruppeId', requireAny, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
-  res.json(toGruppe(g, { includeInvite: isOwner(req, g) }));
+truppsRouter.get('/:truppId', requireAny, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
+  res.json(toTrupp(trupp, { includeInvite: isOwner(req, trupp) }));
 });
 
 const patchSchema = z.object({
@@ -62,28 +64,28 @@ const patchSchema = z.object({
   pruefungstermin: isoDate.nullable().optional(),
 });
 
-gruppenRouter.patch('/:gruppeId', requireLeiter, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
+truppsRouter.patch('/:truppId', requireLeiter, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
   const input = parseBody(patchSchema, req);
-  const updated = await db.gruppen.patch(g.id, (x) => ({
+  const updated = await db.trupps.patch(trupp.id, (x) => ({
     ...x,
     ...(input.name !== undefined ? { name: input.name } : {}),
     ...(input.pruefungstermin !== undefined ? { pruefungstermin: input.pruefungstermin } : {}),
   }));
-  res.json(toGruppe(updated!, { includeInvite: true }));
+  res.json(toTrupp(updated!, { includeInvite: true }));
 });
 
-gruppenRouter.post('/:gruppeId/invite/regenerate', requireLeiter, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
-  const updated = await db.gruppen.patch(g.id, (x) => ({ ...x, inviteToken: randomToken() }));
-  res.json(toGruppe(updated!, { includeInvite: true }));
+truppsRouter.post('/:truppId/invite/regenerate', requireLeiter, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
+  const updated = await db.trupps.patch(trupp.id, (x) => ({ ...x, inviteToken: randomToken() }));
+  res.json(toTrupp(updated!, { includeInvite: true }));
 });
 
 // ---------------------------------------------------------------- Teilnehmer
 
-gruppenRouter.get('/:gruppeId/teilnehmer', requireAny, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
-  const list = await db.teilnehmer.find((t) => t.gruppeId === g.id);
+truppsRouter.get('/:truppId/teilnehmer', requireAny, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
+  const list = await db.teilnehmer.find((t) => t.truppId === trupp.id);
   list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
   res.json(list.map(toTeilnehmer));
 });
@@ -95,22 +97,22 @@ const addTeilnehmerSchema = z.object({ name: nameSchema, ff: ffSchema });
  * Teilnehmer exactly like a self-join, but with a generated password that is returned in
  * plaintext once — the person then logs in via the invite link with name + this password.
  */
-gruppenRouter.post('/:gruppeId/teilnehmer', requireLeiter, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
+truppsRouter.post('/:truppId/teilnehmer', requireLeiter, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
   const input = parseBody(addTeilnehmerSchema, req);
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
 
   const teilnehmer = await db.teilnehmer.update((items) => {
-    const existing = findByName(items, g.id, input.name);
+    const existing = findByName(items, trupp.id, input.name);
     if (existing) {
       throw new HttpError(
         409,
-        `Der Name „${existing.name}" ist in dieser Gruppe schon vergeben. ` +
+        `Der Name „${existing.name}" ist in diesem Trupp schon vergeben. ` +
           'Unterscheide die Person z. B. mit dem Anfangsbuchstaben des Nachnamens.',
       );
     }
-    const rec = newTeilnehmerRecord(g.id, { name: input.name, ff: input.ff, passwordHash });
+    const rec = newTeilnehmerRecord(trupp.id, { name: input.name, ff: input.ff, passwordHash });
     return { items: [...items, rec], result: rec };
   });
 
@@ -126,15 +128,15 @@ const checklistPatch = z.object({
 });
 
 /** Checkliste can be toggled by the Ausbildungsleiter or by the Teilnehmer themself. */
-gruppenRouter.patch('/:gruppeId/teilnehmer/:teilnehmerId/checkliste', requireAny, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
+truppsRouter.patch('/:truppId/teilnehmer/:teilnehmerId/checkliste', requireAny, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
   const teilnehmerId = String(req.params.teilnehmerId);
-  if (!isOwner(req, g) && req.teilnehmer?.sub !== teilnehmerId) {
+  if (!isOwner(req, trupp) && req.teilnehmer?.sub !== teilnehmerId) {
     throw new HttpError(403, 'Nur die eigene Checkliste kann bearbeitet werden');
   }
   const input = parseBody(checklistPatch, req);
   const updated = await db.teilnehmer.update((items) => {
-    const t = items.find((x) => x.id === teilnehmerId && x.gruppeId === g.id);
+    const t = items.find((x) => x.id === teilnehmerId && x.truppId === trupp.id);
     if (!t) return { items, result: undefined };
     // Not applicable for whoever holds GKDT right now. The stored value is kept, so it
     // comes back unchanged if the Rolle is reassigned later.
@@ -146,14 +148,14 @@ gruppenRouter.patch('/:gruppeId/teilnehmer/:teilnehmerId/checkliste', requireAny
   res.json(toTeilnehmer(updated));
 });
 
-gruppenRouter.delete('/:gruppeId/teilnehmer/:teilnehmerId', requireLeiter, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
+truppsRouter.delete('/:truppId/teilnehmer/:teilnehmerId', requireLeiter, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
   const teilnehmerId = String(req.params.teilnehmerId);
-  const removed = await db.teilnehmer.remove((t) => t.id === teilnehmerId && t.gruppeId === g.id);
+  const removed = await db.teilnehmer.remove((t) => t.id === teilnehmerId && t.truppId === trupp.id);
   if (!removed) throw new HttpError(404, 'Teilnehmer nicht gefunden');
   await db.termine.update((items) => ({
     items: items.map((t) =>
-      t.gruppeId === g.id ? { ...t, teilnehmerIds: t.teilnehmerIds.filter((id) => id !== teilnehmerId) } : t,
+      t.truppId === trupp.id ? { ...t, teilnehmerIds: t.teilnehmerIds.filter((id) => id !== teilnehmerId) } : t,
     ),
     result: undefined,
   }));
@@ -163,9 +165,9 @@ gruppenRouter.delete('/:gruppeId/teilnehmer/:teilnehmerId', requireLeiter, async
 
 // ---------------------------------------------------------------- Ressourcen
 
-gruppenRouter.get('/:gruppeId/ressourcen', requireAny, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
-  const list = await db.ressourcen.find((r) => r.gruppeId === g.id);
+truppsRouter.get('/:truppId/ressourcen', requireAny, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
+  const list = await db.ressourcen.find((r) => r.truppId === trupp.id);
   list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
   res.json(list.map(toRessource));
 });
@@ -175,18 +177,18 @@ const ressourceSchema = z.object({
   standort: z.string().trim().max(200).default(''),
 });
 
-gruppenRouter.post('/:gruppeId/ressourcen', requireLeiter, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
+truppsRouter.post('/:truppId/ressourcen', requireLeiter, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
   const input = parseBody(ressourceSchema, req);
-  const rec: RessourceRecord = { id: newId(), gruppeId: g.id, name: input.name, standort: input.standort };
+  const rec: RessourceRecord = { id: newId(), truppId: trupp.id, name: input.name, standort: input.standort };
   await db.ressourcen.insert(rec);
   res.status(201).json(toRessource(rec));
 });
 
-gruppenRouter.delete('/:gruppeId/ressourcen/:ressourceId', requireLeiter, async (req, res) => {
-  const g = await loadGruppeForPrincipal(req);
+truppsRouter.delete('/:truppId/ressourcen/:ressourceId', requireLeiter, async (req, res) => {
+  const trupp = await loadTruppForPrincipal(req);
   const ressourceId = String(req.params.ressourceId);
-  const removed = await db.ressourcen.remove((r) => r.id === ressourceId && r.gruppeId === g.id);
+  const removed = await db.ressourcen.remove((r) => r.id === ressourceId && r.truppId === trupp.id);
   if (!removed) throw new HttpError(404, 'Ressource nicht gefunden');
   // Termine keep existing but lose their booking.
   await db.termine.update((items) => ({

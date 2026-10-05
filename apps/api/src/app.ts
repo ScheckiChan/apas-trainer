@@ -4,7 +4,7 @@ import { rateLimit } from 'express-rate-limit';
 import { config } from './config.js';
 import { errorHandler } from './lib/http.js';
 import { authRouter } from './routes/auth.js';
-import { gruppenRouter } from './routes/gruppen.js';
+import { truppsRouter } from './routes/trupps.js';
 import { joinRouter } from './routes/join.js';
 import { pushRouter } from './routes/push.js';
 import { teilnehmerRouter } from './routes/teilnehmer.js';
@@ -30,7 +30,7 @@ export function createApp() {
       message: { error: 'Zu viele Versuche — bitte später erneut probieren' },
       ...opts,
     });
-  // Password logins: only failed attempts count, so a whole Gruppe behind one NAT can
+  // Password logins: only failed attempts count, so a whole Trupp behind one NAT can
   // still sign in, while brute force is capped at 20 wrong passwords per 15 min and IP.
   const loginLimiter = strict({ limit: 20, skipSuccessfulRequests: true });
   // Joining creates accounts — every attempt counts.
@@ -42,13 +42,13 @@ export function createApp() {
   });
 
   app.use('/api/auth/leiter/login', loginLimiter);
-  app.post('/api/gruppen/:token/login', loginLimiter);
-  app.post('/api/gruppen/:token/join', joinLimiter);
+  app.post('/api/trupps/:token/login', loginLimiter);
+  app.post('/api/trupps/:token/join', joinLimiter);
 
   app.use('/api/auth', authRouter);
-  app.use('/api/gruppen/:gruppeId/termine', termineRouter);
-  app.use('/api/gruppen', joinRouter);
-  app.use('/api/gruppen', gruppenRouter);
+  app.use('/api/trupps/:truppId/termine', termineRouter);
+  app.use('/api/trupps', joinRouter);
+  app.use('/api/trupps', truppsRouter);
   app.use('/api/teilnehmer', teilnehmerRouter);
   app.use('/api/push', pushRouter);
 

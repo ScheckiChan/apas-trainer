@@ -5,7 +5,7 @@ import { db } from '../db.js';
 import { requireLeiter, requireTeilnehmer, signLeiterToken } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { verifyPassword } from '../lib/password.js';
-import { toGruppe, toTeilnehmer } from '../serialize.js';
+import { toTrupp, toTeilnehmer } from '../serialize.js';
 
 export const authRouter = Router();
 
@@ -39,10 +39,10 @@ authRouter.get('/leiter/me', requireLeiter, async (req, res) => {
 
 authRouter.get('/teilnehmer/me', requireTeilnehmer, async (req, res) => {
   const t = await db.teilnehmer.get(req.teilnehmer!.sub);
-  const gruppe = await db.gruppen.get(t!.gruppeId);
-  if (!gruppe) throw new HttpError(404, 'Gruppe nicht gefunden');
+  const trupp = await db.trupps.get(t!.truppId);
+  if (!trupp) throw new HttpError(404, 'Trupp nicht gefunden');
   res.json({
     teilnehmer: toTeilnehmer(t!),
-    gruppe: toGruppe(gruppe, { includeInvite: false }),
+    trupp: toTrupp(trupp, { includeInvite: false }),
   });
 });

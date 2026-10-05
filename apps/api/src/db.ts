@@ -11,7 +11,7 @@ export interface LeiterRecord {
   createdAt: string;
 }
 
-export interface GruppeRecord {
+export interface TruppRecord {
   id: string;
   name: string;
   stufe: Stufe;
@@ -23,7 +23,7 @@ export interface GruppeRecord {
 
 export interface TeilnehmerRecord {
   id: string;
-  gruppeId: string;
+  truppId: string;
   name: string;
   ff: string;
   rolle: Rolle | null;
@@ -35,14 +35,14 @@ export interface TeilnehmerRecord {
 
 export interface RessourceRecord {
   id: string;
-  gruppeId: string;
+  truppId: string;
   name: string;
   standort: string;
 }
 
 export interface TerminRecord {
   id: string;
-  gruppeId: string;
+  truppId: string;
   typ: TerminTyp;
   titel: string;
   start: string;
@@ -75,7 +75,7 @@ const dir = config.dataDir;
 
 export const db = {
   leiter: new JsonCollection<LeiterRecord>(dir, 'ausbildungsleiter'),
-  gruppen: new JsonCollection<GruppeRecord>(dir, 'gruppen'),
+  trupps: new JsonCollection<TruppRecord>(dir, 'trupps'),
   teilnehmer: new JsonCollection<TeilnehmerRecord>(dir, 'teilnehmer'),
   ressourcen: new JsonCollection<RessourceRecord>(dir, 'ressourcen'),
   termine: new JsonCollection<TerminRecord>(dir, 'termine'),

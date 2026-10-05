@@ -16,7 +16,7 @@ import './Calendar.css';
 type Auth = 'leiter' | 'teilnehmer';
 
 interface CalendarProps {
-  gruppeId: string;
+  truppId: string;
   auth: Auth;
   /** Set when a Teilnehmer is viewing — used for permissions and defaults. */
   currentTeilnehmerId?: string;
@@ -38,7 +38,7 @@ function buildGrid(month: Date): Date[] {
   return Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
 }
 
-export function Calendar({ gruppeId, auth, currentTeilnehmerId }: CalendarProps) {
+export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) {
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -58,14 +58,14 @@ export function Calendar({ gruppeId, auth, currentTeilnehmerId }: CalendarProps)
     try {
       setTermine(
         await api<Termin[]>(
-          `/gruppen/${gruppeId}/termine?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
+          `/trupps/${truppId}/termine?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
           { auth },
         ),
       );
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, [grid, gruppeId, auth]);
+  }, [grid, truppId, auth]);
 
   useEffect(() => {
     void loadTermine();
@@ -73,15 +73,15 @@ export function Calendar({ gruppeId, auth, currentTeilnehmerId }: CalendarProps)
 
   useEffect(() => {
     Promise.all([
-      api<Teilnehmer[]>(`/gruppen/${gruppeId}/teilnehmer`, { auth }),
-      api<Ressource[]>(`/gruppen/${gruppeId}/ressourcen`, { auth }),
+      api<Teilnehmer[]>(`/trupps/${truppId}/teilnehmer`, { auth }),
+      api<Ressource[]>(`/trupps/${truppId}/ressourcen`, { auth }),
     ])
       .then(([t, r]) => {
         setTeilnehmer(t);
         setRessourcen(r);
       })
       .catch((err) => setError(errorMessage(err)));
-  }, [gruppeId, auth]);
+  }, [truppId, auth]);
 
   const termineOn = (day: Date): Termin[] => {
     const start = day.getTime();
@@ -209,7 +209,7 @@ export function Calendar({ gruppeId, auth, currentTeilnehmerId }: CalendarProps)
         <TerminEditor
           key={editor.mode === 'edit' ? editor.termin.id : `${editor.typ}-${editor.date}`}
           state={editor}
-          gruppeId={gruppeId}
+          truppId={truppId}
           auth={auth}
           currentTeilnehmerId={currentTeilnehmerId}
           teilnehmer={teilnehmer}
@@ -229,7 +229,7 @@ export function Calendar({ gruppeId, auth, currentTeilnehmerId }: CalendarProps)
 
 function TerminEditor({
   state,
-  gruppeId,
+  truppId,
   auth,
   currentTeilnehmerId,
   teilnehmer,
@@ -238,7 +238,7 @@ function TerminEditor({
   onSaved,
 }: {
   state: NonNullable<EditorState>;
-  gruppeId: string;
+  truppId: string;
   auth: Auth;
   currentTeilnehmerId?: string;
   teilnehmer: Teilnehmer[];
@@ -276,7 +276,7 @@ function TerminEditor({
       return;
     }
     const handle = setTimeout(() => {
-      api<BuchungsKonflikt[]>(`/gruppen/${gruppeId}/termine/konflikte`, {
+      api<BuchungsKonflikt[]>(`/trupps/${truppId}/termine/konflikte`, {
         method: 'POST',
         auth,
         body: {
@@ -290,7 +290,7 @@ function TerminEditor({
         .catch(() => setKonflikte([]));
     }, 250);
     return () => clearTimeout(handle);
-  }, [ressourceId, date, startTime, endTime, timesValid, gruppeId, auth, existing?.id]);
+  }, [ressourceId, date, startTime, endTime, timesValid, truppId, auth, existing?.id]);
 
   const toggleTn = (id: string) =>
     setSelected((s) => {
@@ -318,7 +318,7 @@ function TerminEditor({
     };
     try {
       const res = await api<TerminSaveResponse>(
-        existing ? `/gruppen/${gruppeId}/termine/${existing.id}` : `/gruppen/${gruppeId}/termine`,
+        existing ? `/trupps/${truppId}/termine/${existing.id}` : `/trupps/${truppId}/termine`,
         { method: existing ? 'PUT' : 'POST', auth, body },
       );
       if (res.konflikte.length > 0) {
@@ -336,7 +336,7 @@ function TerminEditor({
   const remove = async () => {
     if (!existing || !confirm(`Termin „${existing.titel}" löschen?`)) return;
     try {
-      await api(`/gruppen/${gruppeId}/termine/${existing.id}`, { method: 'DELETE', auth });
+      await api(`/trupps/${truppId}/termine/${existing.id}`, { method: 'DELETE', auth });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -438,7 +438,7 @@ function TerminEditor({
               )}
             </div>
             {teilnehmer.length === 0 ? (
-              <p className="muted">Noch keine Teilnehmer in der Gruppe.</p>
+              <p className="muted">Noch keine Teilnehmer im Trupp.</p>
             ) : (
               <div className="cal-tn-list">
                 {teilnehmer.map((t) => (

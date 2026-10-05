@@ -10,7 +10,7 @@ import {
 import { api, type AuthKind } from '../lib/api';
 import './Rollen.css';
 
-/** PATCH /teilnehmer/:id/rolle — usable by the Ausbildungsleiter and every Teilnehmer of the Gruppe. */
+/** PATCH /teilnehmer/:id/rolle — usable by the Ausbildungsleiter and every Teilnehmer of the Trupp. */
 export function saveRolle(teilnehmerId: string, rolle: Rolle | null, auth: Exclude<AuthKind, 'none'>) {
   const body: RolleUpdate = { rolle };
   return api<Teilnehmer>(`/teilnehmer/${teilnehmerId}/rolle`, { method: 'PATCH', auth, body });

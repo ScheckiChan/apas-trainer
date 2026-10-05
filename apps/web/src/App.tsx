@@ -3,8 +3,8 @@ import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-do
 import { AppHeader } from './components/AppHeader';
 import { getToken } from './lib/api';
 import { Calendar } from './views/Calendar';
-import { GroupDetail } from './views/GroupDetail';
-import { GroupsDashboard } from './views/GroupsDashboard';
+import { TruppDetail } from './views/TruppDetail';
+import { TruppDashboard } from './views/TruppDashboard';
 import { Join } from './views/Join';
 import { Login } from './views/Login';
 import { StationDetail } from './views/StationDetail';
@@ -20,18 +20,18 @@ function RequireTeilnehmer({ children }: { children: ReactElement }) {
 }
 
 function Home() {
-  if (getToken('leiter')) return <Navigate to="/gruppen" replace />;
+  if (getToken('leiter')) return <Navigate to="/trupps" replace />;
   if (getToken('teilnehmer')) return <Navigate to="/teilnehmer" replace />;
   return <Navigate to="/login" replace />;
 }
 
 function LeiterCalendarPage() {
-  const { gruppeId } = useParams();
+  const { truppId } = useParams();
   return (
     <>
-      <AppHeader backTo={`/gruppen/${gruppeId}`} />
+      <AppHeader backTo={`/trupps/${truppId}`} />
       <main className="page">
-        <Calendar gruppeId={gruppeId!} auth="leiter" />
+        <Calendar truppId={truppId!} auth="leiter" />
       </main>
     </>
   );
@@ -39,8 +39,8 @@ function LeiterCalendarPage() {
 
 /** Where the station overview lives for the current URL, and where its back arrow goes. */
 function useStationsBase(): { basePath: string; backTo: string } {
-  const { gruppeId } = useParams();
-  if (gruppeId) return { basePath: `/gruppen/${gruppeId}/stationen`, backTo: `/gruppen/${gruppeId}` };
+  const { truppId } = useParams();
+  if (truppId) return { basePath: `/trupps/${truppId}/stationen`, backTo: `/trupps/${truppId}` };
   return { basePath: '/stationen', backTo: '/' };
 }
 
@@ -92,11 +92,11 @@ export function App() {
       <Route path="/stationen" element={<StationsPage />} />
       <Route path="/stationen/:stationId" element={<StationDetailPage />} />
 
-      <Route path="/gruppen" element={<RequireLeiter><GroupsDashboard /></RequireLeiter>} />
-      <Route path="/gruppen/:gruppeId" element={<RequireLeiter><GroupDetail /></RequireLeiter>} />
-      <Route path="/gruppen/:gruppeId/kalender" element={<RequireLeiter><LeiterCalendarPage /></RequireLeiter>} />
-      <Route path="/gruppen/:gruppeId/stationen" element={<RequireLeiter><StationsPage /></RequireLeiter>} />
-      <Route path="/gruppen/:gruppeId/stationen/:stationId" element={<RequireLeiter><StationDetailPage /></RequireLeiter>} />
+      <Route path="/trupps" element={<RequireLeiter><TruppDashboard /></RequireLeiter>} />
+      <Route path="/trupps/:truppId" element={<RequireLeiter><TruppDetail /></RequireLeiter>} />
+      <Route path="/trupps/:truppId/kalender" element={<RequireLeiter><LeiterCalendarPage /></RequireLeiter>} />
+      <Route path="/trupps/:truppId/stationen" element={<RequireLeiter><StationsPage /></RequireLeiter>} />
+      <Route path="/trupps/:truppId/stationen/:stationId" element={<RequireLeiter><StationDetailPage /></RequireLeiter>} />
 
       <Route path="/teilnehmer" element={<RequireTeilnehmer><TeilnehmerView /></RequireTeilnehmer>} />
       <Route path="/teilnehmer/stationen" element={<Navigate to="/teilnehmer?tab=stationen" replace />} />

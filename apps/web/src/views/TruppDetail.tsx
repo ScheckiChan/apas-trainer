@@ -1,7 +1,7 @@
 import {
   checklistAmpel,
   type ChecklistItem,
-  type Gruppe,
+  type Trupp,
   type Rolle,
   type Ressource,
   type Teilnehmer,
@@ -15,26 +15,26 @@ import { AmpelDot, ChecklistToggles } from '../components/Checklist';
 import { RolleSelect, RollenAbdeckung, saveRolle } from '../components/Rollen';
 import { api, errorMessage } from '../lib/api';
 import { countdownLabel } from '../lib/format';
-import './GroupDetail.css';
+import './TruppDetail.css';
 
-export function GroupDetail() {
-  const { gruppeId } = useParams();
-  const [gruppe, setGruppe] = useState<Gruppe | null>(null);
+export function TruppDetail() {
+  const { truppId } = useParams();
+  const [trupp, setTrupp] = useState<Trupp | null>(null);
   const [teilnehmer, setTeilnehmer] = useState<Teilnehmer[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [g, t] = await Promise.all([
-        api<Gruppe>(`/gruppen/${gruppeId}`, { auth: 'leiter' }),
-        api<Teilnehmer[]>(`/gruppen/${gruppeId}/teilnehmer`, { auth: 'leiter' }),
+      const [tr, t] = await Promise.all([
+        api<Trupp>(`/trupps/${truppId}`, { auth: 'leiter' }),
+        api<Teilnehmer[]>(`/trupps/${truppId}/teilnehmer`, { auth: 'leiter' }),
       ]);
-      setGruppe(g);
+      setTrupp(tr);
       setTeilnehmer(t);
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, [gruppeId]);
+  }, [truppId]);
 
   useEffect(() => {
     void load();
@@ -43,7 +43,7 @@ export function GroupDetail() {
   const toggle = async (t: Teilnehmer, item: ChecklistItem) => {
     const next = t.checkliste[item] === 'ok' ? 'offen' : 'ok';
     try {
-      const updated = await api<Teilnehmer>(`/gruppen/${gruppeId}/teilnehmer/${t.id}/checkliste`, {
+      const updated = await api<Teilnehmer>(`/trupps/${truppId}/teilnehmer/${t.id}/checkliste`, {
         method: 'PATCH',
         auth: 'leiter',
         body: { [item]: next },
@@ -64,9 +64,9 @@ export function GroupDetail() {
   };
 
   const remove = async (t: Teilnehmer) => {
-    if (!confirm(`${t.name} aus der Gruppe entfernen?`)) return;
+    if (!confirm(`${t.name} aus dem Trupp entfernen?`)) return;
     try {
-      await api(`/gruppen/${gruppeId}/teilnehmer/${t.id}`, { method: 'DELETE', auth: 'leiter' });
+      await api(`/trupps/${truppId}/teilnehmer/${t.id}`, { method: 'DELETE', auth: 'leiter' });
       setTeilnehmer((list) => list.filter((x) => x.id !== t.id));
     } catch (err) {
       alert(errorMessage(err));
@@ -76,17 +76,17 @@ export function GroupDetail() {
   if (error) {
     return (
       <>
-        <AppHeader backTo="/gruppen" />
+        <AppHeader backTo="/trupps" />
         <main className="page">
           <div className="alert alert-error">{error}</div>
         </main>
       </>
     );
   }
-  if (!gruppe) {
+  if (!trupp) {
     return (
       <>
-        <AppHeader backTo="/gruppen" />
+        <AppHeader backTo="/trupps" />
         <main className="page muted">Lade…</main>
       </>
     );
@@ -96,26 +96,26 @@ export function GroupDetail() {
 
   return (
     <>
-      <AppHeader backTo="/gruppen" />
+      <AppHeader backTo="/trupps" />
       <main className="page stack">
         <div className="gd-head">
           <div>
-            <h1>{gruppe.name}</h1>
-            <span className="badge">{countdownLabel(gruppe.pruefungstermin)}</span>
+            <h1>{trupp.name}</h1>
+            <span className="badge">{countdownLabel(trupp.pruefungstermin)}</span>
           </div>
           <div className="btn-row">
-            <Link className="btn" to={`/gruppen/${gruppe.id}/kalender`}>
+            <Link className="btn" to={`/trupps/${trupp.id}/kalender`}>
               📅 Kalender
             </Link>
-            <Link className="btn btn-secondary" to={`/gruppen/${gruppe.id}/stationen`}>
+            <Link className="btn btn-secondary" to={`/trupps/${trupp.id}/stationen`}>
               Stationen
             </Link>
           </div>
         </div>
 
         <div className="gd-grid">
-          <PruefungsterminEditor gruppe={gruppe} onSaved={setGruppe} />
-          <InvitePanel gruppe={gruppe} onRegenerated={setGruppe} />
+          <PruefungsterminEditor trupp={trupp} onSaved={setTrupp} />
+          <InvitePanel trupp={trupp} onRegenerated={setTrupp} />
         </div>
 
         <section className="card">
@@ -127,7 +127,7 @@ export function GroupDetail() {
           </div>
           {teilnehmer.length > 0 && <RollenAbdeckung teilnehmer={teilnehmer} />}
           <AddTeilnehmer
-            gruppeId={gruppe.id}
+            truppId={trupp.id}
             onAdded={(t) => setTeilnehmer((list) => [...list, t].sort((a, b) => a.name.localeCompare(b.name, 'de')))}
           />
           {teilnehmer.length === 0 ? (
@@ -149,7 +149,7 @@ export function GroupDetail() {
                     type="button"
                     className="btn btn-ghost btn-small gd-remove"
                     onClick={() => remove(t)}
-                    title="Aus Gruppe entfernen"
+                    title="Aus dem Trupp entfernen"
                     aria-label={`${t.name} entfernen`}
                   >
                     ✕
@@ -160,7 +160,7 @@ export function GroupDetail() {
           )}
         </section>
 
-        <RessourcenPanel gruppeId={gruppe.id} />
+        <RessourcenPanel truppId={trupp.id} />
       </main>
     </>
   );
@@ -170,7 +170,7 @@ export function GroupDetail() {
  * Direct add without the invite link (e.g. pre-populating a Trupp). The generated password
  * is only in the API response, so it is shown exactly once here.
  */
-function AddTeilnehmer({ gruppeId, onAdded }: { gruppeId: string; onAdded: (t: Teilnehmer) => void }) {
+function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Teilnehmer) => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [ff, setFf] = useState('');
@@ -184,7 +184,7 @@ function AddTeilnehmer({ gruppeId, onAdded }: { gruppeId: string; onAdded: (t: T
     setBusy(true);
     setError(null);
     try {
-      const res = await api<TeilnehmerCreateResponse>(`/gruppen/${gruppeId}/teilnehmer`, {
+      const res = await api<TeilnehmerCreateResponse>(`/trupps/${truppId}/teilnehmer`, {
         method: 'POST',
         auth: 'leiter',
         body: { name, ff },
@@ -277,23 +277,23 @@ function AddTeilnehmer({ gruppeId, onAdded }: { gruppeId: string; onAdded: (t: T
   );
 }
 
-function PruefungsterminEditor({ gruppe, onSaved }: { gruppe: Gruppe; onSaved: (g: Gruppe) => void }) {
-  const [value, setValue] = useState(gruppe.pruefungstermin ?? '');
+function PruefungsterminEditor({ trupp, onSaved }: { trupp: Trupp; onSaved: (trupp: Trupp) => void }) {
+  const [value, setValue] = useState(trupp.pruefungstermin ?? '');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const dirty = value !== (gruppe.pruefungstermin ?? '');
+  const dirty = value !== (trupp.pruefungstermin ?? '');
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setMsg(null);
     try {
-      const g = await api<Gruppe>(`/gruppen/${gruppe.id}`, {
+      const updated = await api<Trupp>(`/trupps/${trupp.id}`, {
         method: 'PATCH',
         auth: 'leiter',
         body: { pruefungstermin: value || null },
       });
-      onSaved(g);
+      onSaved(updated);
       setMsg('Gespeichert');
     } catch (err) {
       setMsg(errorMessage(err));
@@ -316,8 +316,8 @@ function PruefungsterminEditor({ gruppe, onSaved }: { gruppe: Gruppe; onSaved: (
   );
 }
 
-function InvitePanel({ gruppe, onRegenerated }: { gruppe: Gruppe; onRegenerated: (g: Gruppe) => void }) {
-  const link = `${window.location.origin}/join/${gruppe.inviteToken ?? ''}`;
+function InvitePanel({ trupp, onRegenerated }: { trupp: Trupp; onRegenerated: (trupp: Trupp) => void }) {
+  const link = `${window.location.origin}/join/${trupp.inviteToken ?? ''}`;
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -340,7 +340,7 @@ function InvitePanel({ gruppe, onRegenerated }: { gruppe: Gruppe; onRegenerated:
   const regenerate = async () => {
     if (!confirm('Neuen Einladungslink erzeugen? Der bisherige Link funktioniert danach nicht mehr.')) return;
     try {
-      onRegenerated(await api<Gruppe>(`/gruppen/${gruppe.id}/invite/regenerate`, { method: 'POST', auth: 'leiter' }));
+      onRegenerated(await api<Trupp>(`/trupps/${trupp.id}/invite/regenerate`, { method: 'POST', auth: 'leiter' }));
     } catch (err) {
       alert(errorMessage(err));
     }
@@ -365,23 +365,23 @@ function InvitePanel({ gruppe, onRegenerated }: { gruppe: Gruppe; onRegenerated:
   );
 }
 
-function RessourcenPanel({ gruppeId }: { gruppeId: string }) {
+function RessourcenPanel({ truppId }: { truppId: string }) {
   const [list, setList] = useState<Ressource[]>([]);
   const [name, setName] = useState('');
   const [standort, setStandort] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api<Ressource[]>(`/gruppen/${gruppeId}/ressourcen`, { auth: 'leiter' })
+    api<Ressource[]>(`/trupps/${truppId}/ressourcen`, { auth: 'leiter' })
       .then(setList)
       .catch((err) => setError(errorMessage(err)));
-  }, [gruppeId]);
+  }, [truppId]);
 
   const add = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
-      const r = await api<Ressource>(`/gruppen/${gruppeId}/ressourcen`, {
+      const r = await api<Ressource>(`/trupps/${truppId}/ressourcen`, {
         method: 'POST',
         auth: 'leiter',
         body: { name, standort },
@@ -397,7 +397,7 @@ function RessourcenPanel({ gruppeId }: { gruppeId: string }) {
   const remove = async (r: Ressource) => {
     if (!confirm(`Ressource „${r.name}" löschen? Bestehende Termine verlieren die Buchung.`)) return;
     try {
-      await api(`/gruppen/${gruppeId}/ressourcen/${r.id}`, { method: 'DELETE', auth: 'leiter' });
+      await api(`/trupps/${truppId}/ressourcen/${r.id}`, { method: 'DELETE', auth: 'leiter' });
       setList((l) => l.filter((x) => x.id !== r.id));
     } catch (err) {
       setError(errorMessage(err));

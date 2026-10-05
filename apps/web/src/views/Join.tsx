@@ -9,7 +9,7 @@ type Mode = 'neu' | 'anmelden';
 
 /**
  * /join/:token — "Neu beitreten" (Name, FF, Passwort) or "Anmelden" (Name, Passwort).
- * Both are scoped to this Gruppe's invite token and log in straight away.
+ * Both are scoped to this Trupp's invite token and log in straight away.
  */
 export function Join() {
   const { token = '' } = useParams();
@@ -29,7 +29,7 @@ export function Join() {
   // Join rejected because the name is taken → offer the switch to "Anmelden".
   const [nameTaken, setNameTaken] = useState(false);
 
-  const base = `/gruppen/${encodeURIComponent(token)}`;
+  const base = `/trupps/${encodeURIComponent(token)}`;
 
   useEffect(() => {
     api<JoinInfo>(`${base}/join`, { auth: 'none' })
@@ -63,7 +63,7 @@ export function Join() {
         body,
       });
       setToken('teilnehmer', session.token);
-      rememberInvite({ token, gruppeName: session.gruppe.name });
+      rememberInvite({ token, truppName: session.trupp.name });
       navigate('/teilnehmer', { replace: true });
     } catch (err) {
       setError(errorMessage(err));
@@ -82,7 +82,7 @@ export function Join() {
             <h1>APAS-Trainer</h1>
             {info && (
               <p>
-                Übungsgruppe <strong>{info.gruppeName}</strong>
+                Trupp <strong>{info.truppName}</strong>
                 {info.pruefungstermin && <> · Prüfung am {formatDate(info.pruefungstermin)}</>}
               </p>
             )}
@@ -114,7 +114,7 @@ export function Join() {
             </div>
             <p className="muted">
               {mode === 'neu'
-                ? 'Lege dein Konto für diese Gruppe an. Deine Rolle wird später gemeinsam in der Gruppe eingeteilt.'
+                ? 'Lege dein Konto für diesen Trupp an. Deine Rolle wird später gemeinsam im Trupp eingeteilt.'
                 : 'Schon beigetreten? Melde dich mit deinem Namen und Passwort an.'}
             </p>
             {error && (

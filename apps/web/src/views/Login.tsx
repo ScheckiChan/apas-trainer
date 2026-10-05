@@ -17,7 +17,7 @@ export function Login() {
         <p>Gemeinsam zur Ausbildungsprüfung Atemschutz — Bronze</p>
       </div>
       <div className={`login-cards ${teilnehmerFirst ? 'login-cards-reverse' : ''}`}>
-        <LeiterLogin onSuccess={() => navigate('/gruppen', { replace: true })} />
+        <LeiterLogin onSuccess={() => navigate('/trupps', { replace: true })} />
         <TeilnehmerHint />
       </div>
     </div>
@@ -85,7 +85,7 @@ function LeiterLogin({ onSuccess }: { onSuccess: () => void }) {
 }
 
 /**
- * Teilnehmer accounts belong to one Gruppe, so they sign in on that Gruppe's invite link
+ * Teilnehmer accounts belong to one Trupp, so they sign in on that Trupp's invite link
  * (Name + Passwort). The last used link is remembered on this device.
  */
 function TeilnehmerHint() {
@@ -94,12 +94,12 @@ function TeilnehmerHint() {
     <section className="card stack">
       <h2>Teilnehmer</h2>
       <p className="muted">
-        Öffne den Einladungslink (oder QR-Code) deiner Übungsgruppe und wähle dort „Anmelden" — mit deinem Namen und
+        Öffne den Einladungslink (oder QR-Code) deines Trupps und wähle dort „Anmelden" — mit deinem Namen und
         Passwort. Neu dabei? Über denselben Link kannst du beitreten.
       </p>
       {invite && (
         <Link className="btn btn-secondary" to={`/join/${encodeURIComponent(invite.token)}?anmelden`}>
-          Anmelden bei „{invite.gruppeName}"
+          Anmelden bei „{invite.truppName}"
         </Link>
       )}
     </section>

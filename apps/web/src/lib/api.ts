@@ -75,12 +75,12 @@ export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : 'Unbekannter Fehler';
 
 /**
- * Teilnehmer log in via their Gruppe's invite link (identity = Gruppe + Name). The last
+ * Teilnehmer log in via their Trupp's invite link (identity = Trupp + Name). The last
  * used link is remembered so the Login page can send returning Teilnehmer back to it.
  */
 export interface LastInvite {
   token: string;
-  gruppeName: string;
+  truppName: string;
 }
 
 const LAST_INVITE_KEY = 'apas.lastInvite';
@@ -91,10 +91,12 @@ export function rememberInvite(invite: LastInvite): void {
 
 export function lastInvite(): LastInvite | null {
   try {
-    const v = JSON.parse(localStorage.getItem(LAST_INVITE_KEY) ?? 'null') as Partial<LastInvite> | null;
-    return v && typeof v.token === 'string' && typeof v.gruppeName === 'string'
-      ? { token: v.token, gruppeName: v.gruppeName }
-      : null;
+    const v = JSON.parse(localStorage.getItem(LAST_INVITE_KEY) ?? 'null') as
+      | (Partial<LastInvite> & { gruppeName?: unknown })
+      | null;
+    // Entries saved before the Gruppe → Trupp rename use `gruppeName`.
+    const truppName = v?.truppName ?? v?.gruppeName;
+    return v && typeof v.token === 'string' && typeof truppName === 'string' ? { token: v.token, truppName } : null;
   } catch {
     return null;
   }

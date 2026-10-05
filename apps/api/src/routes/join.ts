@@ -1,39 +1,39 @@
 import type { JoinInfo, TeilnehmerSession } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
-import { db, type GruppeRecord, type TeilnehmerRecord } from '../db.js';
+import { db, type TruppRecord, type TeilnehmerRecord } from '../db.js';
 import { signTeilnehmerToken } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { ffSchema, findByName, nameSchema, newTeilnehmerRecord } from '../lib/teilnehmer.js';
-import { toGruppe, toTeilnehmer } from '../serialize.js';
+import { toTrupp, toTeilnehmer } from '../serialize.js';
 
 /**
- * Public Teilnehmer entry points, all scoped by the Gruppe's invite token.
- * Mounted at /api/gruppen (next to the authenticated gruppenRouter):
+ * Public Teilnehmer entry points, all scoped by the Trupp's invite token.
+ * Mounted at /api/trupps (next to the authenticated truppsRouter):
  *   GET  /:token/join   → JoinInfo
  *   POST /:token/join   → create Teilnehmer + session
  *   POST /:token/login  → session for an existing Teilnehmer
  */
 export const joinRouter = Router();
 
-async function gruppeByInvite(token: string): Promise<GruppeRecord> {
-  const g = await db.gruppen.findOne((x) => x.inviteToken === token);
-  if (!g) throw new HttpError(404, 'Einladungslink ungültig oder nicht mehr aktiv');
-  return g;
+async function truppByInvite(token: string): Promise<TruppRecord> {
+  const trupp = await db.trupps.findOne((x) => x.inviteToken === token);
+  if (!trupp) throw new HttpError(404, 'Einladungslink ungültig oder nicht mehr aktiv');
+  return trupp;
 }
 
-function session(t: TeilnehmerRecord, g: GruppeRecord): TeilnehmerSession {
+function session(t: TeilnehmerRecord, trupp: TruppRecord): TeilnehmerSession {
   return {
-    token: signTeilnehmerToken({ sub: t.id, gruppeId: t.gruppeId }),
+    token: signTeilnehmerToken({ sub: t.id, truppId: t.truppId }),
     teilnehmer: toTeilnehmer(t),
-    gruppe: toGruppe(g, { includeInvite: false }),
+    trupp: toTrupp(trupp, { includeInvite: false }),
   };
 }
 
 joinRouter.get('/:token/join', async (req, res) => {
-  const g = await gruppeByInvite(String(req.params.token));
-  const body: JoinInfo = { gruppeName: g.name, pruefungstermin: g.pruefungstermin };
+  const trupp = await truppByInvite(String(req.params.token));
+  const body: JoinInfo = { truppName: trupp.name, pruefungstermin: trupp.pruefungstermin };
   res.json(body);
 });
 
@@ -45,17 +45,17 @@ const joinSchema = z.object({
 });
 
 joinRouter.post('/:token/join', async (req, res) => {
-  const gruppe = await gruppeByInvite(String(req.params.token));
+  const trupp = await truppByInvite(String(req.params.token));
   const input = parseBody(joinSchema, req);
   // Hash outside the collection lock — bcrypt is deliberately slow.
   const passwordHash = await hashPassword(input.password);
 
   const teilnehmer = await db.teilnehmer.update((items) => {
-    const existing = findByName(items, gruppe.id, input.name);
+    const existing = findByName(items, trupp.id, input.name);
     if (existing?.passwordHash) {
       throw new HttpError(
         409,
-        `Der Name „${existing.name}" ist in dieser Gruppe schon vergeben. Wenn du das bist, wähle „Anmelden". ` +
+        `Der Name „${existing.name}" ist in diesem Trupp schon vergeben. Wenn du das bist, wähle „Anmelden". ` +
           'Sonst unterscheide dich z. B. mit dem Anfangsbuchstaben deines Nachnamens.',
       );
     }
@@ -68,11 +68,11 @@ joinRouter.post('/:token/join', async (req, res) => {
       const claimed: TeilnehmerRecord = { ...rest, name: input.name, ff: input.ff, passwordHash };
       return { items: items.map((t) => (t.id === existing.id ? claimed : t)), result: claimed };
     }
-    const rec = newTeilnehmerRecord(gruppe.id, { name: input.name, ff: input.ff, passwordHash });
+    const rec = newTeilnehmerRecord(trupp.id, { name: input.name, ff: input.ff, passwordHash });
     return { items: [...items, rec], result: rec };
   });
 
-  res.status(201).json(session(teilnehmer, gruppe));
+  res.status(201).json(session(teilnehmer, trupp));
 });
 
 const loginSchema = z.object({
@@ -81,9 +81,9 @@ const loginSchema = z.object({
 });
 
 joinRouter.post('/:token/login', async (req, res) => {
-  const gruppe = await gruppeByInvite(String(req.params.token));
+  const trupp = await truppByInvite(String(req.params.token));
   const input = parseBody(loginSchema, req);
-  const t = findByName(await db.teilnehmer.all(), gruppe.id, input.name);
+  const t = findByName(await db.teilnehmer.all(), trupp.id, input.name);
 
   if (t && !t.passwordHash) {
     throw new HttpError(
@@ -94,5 +94,5 @@ joinRouter.post('/:token/login', async (req, res) => {
   if (!t || !(await verifyPassword(input.password, t.passwordHash))) {
     throw new HttpError(401, 'Name oder Passwort falsch');
   }
-  res.json(session(t, gruppe));
+  res.json(session(t, trupp));
 });

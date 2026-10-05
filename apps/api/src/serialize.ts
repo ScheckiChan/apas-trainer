@@ -1,22 +1,22 @@
-import type { Gruppe, Ressource, Teilnehmer, Termin } from '@apas/shared';
-import type { GruppeRecord, RessourceRecord, TeilnehmerRecord, TerminRecord } from './db.js';
+import type { Trupp, Ressource, Teilnehmer, Termin } from '@apas/shared';
+import type { TruppRecord, RessourceRecord, TeilnehmerRecord, TerminRecord } from './db.js';
 
-export function toGruppe(g: GruppeRecord, opts: { includeInvite: boolean }): Gruppe {
+export function toTrupp(trupp: TruppRecord, opts: { includeInvite: boolean }): Trupp {
   return {
-    id: g.id,
-    name: g.name,
-    stufe: g.stufe,
-    pruefungstermin: g.pruefungstermin,
-    ownerId: g.ownerId,
-    createdAt: g.createdAt,
-    ...(opts.includeInvite ? { inviteToken: g.inviteToken } : {}),
+    id: trupp.id,
+    name: trupp.name,
+    stufe: trupp.stufe,
+    pruefungstermin: trupp.pruefungstermin,
+    ownerId: trupp.ownerId,
+    createdAt: trupp.createdAt,
+    ...(opts.includeInvite ? { inviteToken: trupp.inviteToken } : {}),
   };
 }
 
 export function toTeilnehmer(t: TeilnehmerRecord): Teilnehmer {
   return {
     id: t.id,
-    gruppeId: t.gruppeId,
+    truppId: t.truppId,
     name: t.name,
     ff: t.ff,
     rolle: t.rolle ?? null,
@@ -26,13 +26,13 @@ export function toTeilnehmer(t: TeilnehmerRecord): Teilnehmer {
 }
 
 export function toRessource(r: RessourceRecord): Ressource {
-  return { id: r.id, gruppeId: r.gruppeId, name: r.name, standort: r.standort };
+  return { id: r.id, truppId: r.truppId, name: r.name, standort: r.standort };
 }
 
 export function toTermin(t: TerminRecord): Termin {
   return {
     id: t.id,
-    gruppeId: t.gruppeId,
+    truppId: t.truppId,
     typ: t.typ,
     titel: t.titel,
     start: t.start,

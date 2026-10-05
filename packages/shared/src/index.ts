@@ -88,7 +88,7 @@ export interface Ausbildungsleiter {
   email: string;
 }
 
-export interface Gruppe {
+export interface Trupp {
   id: string;
   name: string;
   stufe: Stufe;
@@ -100,17 +100,19 @@ export interface Gruppe {
   createdAt: string;
 }
 
-export interface GruppeSummary extends Gruppe {
+export interface TruppSummary extends Trupp {
   teilnehmerCount: number;
   bereitCount: number;
+  /** How many of the ROLLEN have at least one holder (0..ROLLEN.length). */
+  rollenBesetzt: number;
 }
 
 export interface Teilnehmer {
   id: string;
-  gruppeId: string;
+  truppId: string;
   name: string;
   ff: string;
-  /** Assigned in the Gruppe at any time (not at join). null = noch keine Rolle. */
+  /** Assigned in the Trupp at any time (not at join). null = noch keine Rolle. */
   rolle: Rolle | null;
   joinedAt: string;
   checkliste: Checkliste;
@@ -118,7 +120,7 @@ export interface Teilnehmer {
 
 export interface Ressource {
   id: string;
-  gruppeId: string;
+  truppId: string;
   name: string;
   standort: string;
 }
@@ -127,7 +129,7 @@ export type TerminTyp = 'fix' | 'individual';
 
 export interface Termin {
   id: string;
-  gruppeId: string;
+  truppId: string;
   typ: TerminTyp;
   titel: string;
   /** ISO datetime */
@@ -173,11 +175,11 @@ export interface LoginResponse {
 export interface TeilnehmerSession {
   token: string;
   teilnehmer: Teilnehmer;
-  gruppe: Gruppe;
+  trupp: Trupp;
 }
 
 export interface JoinInfo {
-  gruppeName: string;
+  truppName: string;
   pruefungstermin?: string | null;
 }
 
@@ -187,7 +189,7 @@ export interface JoinRequest {
   password: string;
 }
 
-/** Ausbildungsleiter adds a Teilnehmer directly (POST /gruppen/:id/teilnehmer). */
+/** Ausbildungsleiter adds a Teilnehmer directly (POST /trupps/:id/teilnehmer). */
 export interface TeilnehmerCreateRequest {
   name: string;
   ff: string;
