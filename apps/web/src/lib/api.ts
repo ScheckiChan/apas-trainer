@@ -1,4 +1,4 @@
-import type { ApiError } from '@apas/shared';
+import type { ApiError, Termin } from '@apas/shared';
 
 /**
  * One account, one token per device. `auth: 'auth'` sends it, `'none'` doesn't (public
@@ -107,6 +107,16 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
 
 export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : 'Unbekannter Fehler';
+
+/**
+ * "Anwesend" on a Fixtermin: add (PUT) or remove (DELETE) one Benutzer. Everyone may toggle
+ * themselves, Ausbilder anyone. Resolves with the updated Termin.
+ */
+export function setAnwesend(terminId: string, benutzerId: string, anwesend: boolean): Promise<Termin> {
+  return api<Termin>(`/termine/${encodeURIComponent(terminId)}/anwesend/${encodeURIComponent(benutzerId)}`, {
+    method: anwesend ? 'PUT' : 'DELETE',
+  });
+}
 
 /**
  * The last invite link used on this device — the Join page opens on "Anmelden" when the
