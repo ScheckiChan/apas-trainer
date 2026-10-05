@@ -1,8 +1,11 @@
 import {
+  isPlaceholderEmail,
   SYSTEM_ROLLE_LABELS,
   SYSTEM_ROLLEN,
   WAPPEN_CONTENT_TYPES,
   WAPPEN_MAX_BYTES,
+  type BenutzerEmailUpdate,
+  type BenutzerNameUpdate,
   type BenutzerUebersicht,
   type Einstellungen,
   type EinstellungenUpdate,
@@ -16,7 +19,7 @@ import { AppHeader } from '../components/AppHeader';
 import { EinmalPasswort } from '../components/EinmalPasswort';
 import { Icon } from '../components/Icon';
 import { TruppName } from '../components/TruppName';
-import { api, apiUrl, errorMessage } from '../lib/api';
+import { HttpError, api, apiUrl, errorMessage, fieldError, formError } from '../lib/api';
 import { useEinstellungen } from '../lib/einstellungen';
 import { homePath, useMe, useSession } from '../lib/session';
 import './Benutzer.css';
@@ -34,6 +37,7 @@ export function BenutzerVerwaltung() {
   const [konten, setKonten] = useState<BenutzerUebersicht[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [suche, setSuche] = useState('');
+  const [nurOhneEmail, setNurOhneEmail] = useState(false);
 
   useEffect(() => {
     api<BenutzerUebersicht[]>('/benutzer')
@@ -47,15 +51,23 @@ export function BenutzerVerwaltung() {
     return c;
   }, [konten]);
 
+  // Accounts that still log in with a migration placeholder — the Ausbilder's to-do list.
+  const ohneEmail = useMemo(() => (konten ?? []).filter((k) => isPlaceholderEmail(k.email)).length, [konten]);
+
   const sichtbar = useMemo(() => {
     const q = suche.trim().toLocaleLowerCase('de');
-    if (!konten || !q) return konten;
-    return konten.filter((k) =>
-      [k.name, k.ff, k.trupp?.name, SYSTEM_ROLLE_LABELS[k.systemRolle]].some((v) =>
-        v?.toLocaleLowerCase('de').includes(q),
-      ),
+    const basis = nurOhneEmail ? konten?.filter((k) => isPlaceholderEmail(k.email)) : konten;
+    if (!basis || !q) return basis;
+    return basis.filter((k) =>
+      [
+        k.name,
+        isPlaceholderEmail(k.email) ? null : k.email,
+        k.ff,
+        k.trupp?.name,
+        SYSTEM_ROLLE_LABELS[k.systemRolle],
+      ].some((v) => v?.toLocaleLowerCase('de').includes(q)),
     );
-  }, [konten, suche]);
+  }, [konten, suche, nurOhneEmail]);
 
   const ersetzen = (k: BenutzerUebersicht) => setKonten((list) => list?.map((x) => (x.id === k.id ? k : x)) ?? list);
 
@@ -75,6 +87,7 @@ export function BenutzerVerwaltung() {
             <p className="muted num">
               {anzahl(konten.length, 'Konto', 'Konten')} · {zaehler.ausbilder} Ausbilder · {zaehler.pruefer} Prüfer ·{' '}
               {zaehler.teilnehmer} Teilnehmer
+              {ohneEmail > 0 && <> · {ohneEmail} ohne E-Mail</>}
             </p>
           )}
         </div>
@@ -83,25 +96,39 @@ export function BenutzerVerwaltung() {
           <div className="bv-toolbar">
             <h2 id="bv-konten-titel">Konten</h2>
             {konten && konten.length > 0 && (
-              <div className="bv-suche">
-                <Icon name="search" />
-                <label htmlFor="bv-suche" className="sr-only">
-                  Konten durchsuchen
-                </label>
-                <input
-                  id="bv-suche"
-                  type="search"
-                  placeholder="Name, FF oder Trupp"
-                  value={suche}
-                  onChange={(e) => setSuche(e.target.value)}
-                />
+              <div className="bv-filter">
+                {(ohneEmail > 0 || nurOhneEmail) && (
+                  <button
+                    type="button"
+                    className={`btn btn-secondary btn-small bv-filter-ohne ${nurOhneEmail ? 'bv-filter-aktiv' : ''}`}
+                    aria-pressed={nurOhneEmail}
+                    onClick={() => setNurOhneEmail((v) => !v)}
+                  >
+                    <Icon name={nurOhneEmail ? 'check' : 'mail-warning'} />
+                    Ohne E-Mail <span className="num">({ohneEmail})</span>
+                  </button>
+                )}
+                <div className="bv-suche">
+                  <Icon name="search" />
+                  <label htmlFor="bv-suche" className="sr-only">
+                    Konten durchsuchen
+                  </label>
+                  <input
+                    id="bv-suche"
+                    type="search"
+                    placeholder="Name, E-Mail, FF oder Trupp"
+                    value={suche}
+                    onChange={(e) => setSuche(e.target.value)}
+                  />
+                </div>
               </div>
             )}
           </div>
           <p className="muted bv-intro">
             Die Systemrolle legt fest, was ein Konto in der App darf: Ausbilder verwalten Trupps, Kalender und Konten,
             Prüfer nehmen bei jedem Trupp Stationsergebnisse auf, Teilnehmer sehen ihren eigenen Trupp. Die Rolle im
-            Trupp (GKDT, ATF …) wird davon unabhängig im Trupp eingeteilt.
+            Trupp (GKDT, ATF …) wird davon unabhängig im Trupp eingeteilt. Angemeldet wird mit der E-Mail-Adresse;
+            Konten mit „Keine E-Mail hinterlegt" brauchen noch eine, bevor sich die Person anmelden kann.
           </p>
 
           {error && (
@@ -115,14 +142,16 @@ export function BenutzerVerwaltung() {
           {sichtbar && (
             <div className="bv-table">
               <div className="bv-head" aria-hidden="true">
-                <span>Name</span>
+                <span>Name · E-Mail</span>
                 <span>Feuerwehr</span>
                 <span>Trupp</span>
                 <span>Systemrolle</span>
                 <span className="bv-head-actions">Aktionen</span>
               </div>
               {sichtbar.length === 0 ? (
-                <p className="muted bv-leer">Kein Konto passt zu „{suche.trim()}".</p>
+                <p className="muted bv-leer">
+                  {suche.trim() ? `Kein Konto passt zu „${suche.trim()}".` : 'Alle Konten haben eine E-Mail-Adresse.'}
+                </p>
               ) : (
                 <ul className="bv-list">
                   {sichtbar.map((k) => (
@@ -166,6 +195,25 @@ function KontoZeile({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [bearbeiten, setBearbeiten] = useState<'email' | 'name' | null>(null);
+  const [status, setStatus] = useState('');
+  const { refresh } = useSession();
+  const platzhalter = isPlaceholderEmail(k.email);
+
+  const oeffnen = (feld: 'email' | 'name') => {
+    setBearbeiten(feld);
+    setError(null);
+    setStatus('');
+  };
+
+  const gespeichert = (updated: BenutzerUebersicht) => {
+    onChanged(updated);
+    setBearbeiten(null);
+    setStatus(`Gespeichert: ${updated.name}`);
+    document.getElementById(`bv-edit-${k.id}`)?.focus();
+    // Own name / login changed — the header and session show it.
+    if (selbst) void refresh();
+  };
 
   const changeRolle = async (systemRolle: SystemRolle) => {
     if (systemRolle === k.systemRolle) return;
@@ -236,8 +284,34 @@ function KontoZeile({
   return (
     <div className="bv-row">
       <div className="bv-name">
-        <span>{k.name}</span>
-        {selbst && <span className="badge">du</span>}
+        <span className="bv-name-zeile">
+          <span>{k.name}</span>
+          {selbst && <span className="badge">du</span>}
+        </span>
+        <div className="bv-mail">
+          {platzhalter ? (
+            <span className="bv-email bv-email-fehlt">
+              <Icon name="mail-warning" />
+              <span>Keine E-Mail hinterlegt</span>
+            </span>
+          ) : (
+            <span className="bv-email">
+              <Icon name="mail" />
+              <span>{k.email}</span>
+            </span>
+          )}
+          {platzhalter && bearbeiten === null && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-small bv-email-eintragen"
+              onClick={() => oeffnen('email')}
+              aria-label={`E-Mail-Adresse für ${k.name} eintragen`}
+            >
+              <Icon name="plus" />
+              E-Mail eintragen
+            </button>
+          )}
+        </div>
       </div>
       <div className="bv-meta">
         <span className={`bv-ff ${k.ff ? '' : 'bv-leerwert'}`}>{k.ff ?? '—'}</span>
@@ -274,6 +348,18 @@ function KontoZeile({
       <div className="bv-actions">
         <button
           type="button"
+          id={`bv-edit-${k.id}`}
+          className="btn btn-ghost btn-icon"
+          onClick={() => (bearbeiten ? setBearbeiten(null) : oeffnen('name'))}
+          disabled={busy}
+          aria-expanded={bearbeiten !== null}
+          title="Name und E-Mail bearbeiten"
+          aria-label={`Name und E-Mail von ${k.name} bearbeiten`}
+        >
+          <Icon name="pencil" />
+        </button>
+        <button
+          type="button"
           className="btn btn-ghost btn-icon"
           onClick={passwortZuruecksetzen}
           disabled={busy}
@@ -295,6 +381,21 @@ function KontoZeile({
           </button>
         )}
       </div>
+      {bearbeiten && (
+        <KontoBearbeiten
+          konto={k}
+          fokus={bearbeiten}
+          onSaved={gespeichert}
+          onPartlySaved={onChanged}
+          onCancel={() => {
+            setBearbeiten(null);
+            document.getElementById(`bv-edit-${k.id}`)?.focus();
+          }}
+        />
+      )}
+      <span className="sr-only" role="status">
+        {status}
+      </span>
       {error && (
         <div className="alert alert-error bv-full" role="alert" id={`${selectId}-fehler`}>
           <Icon name="triangle-alert" />
@@ -303,12 +404,171 @@ function KontoZeile({
       )}
       {tempPassword && (
         <div className="bv-full">
-          <EinmalPasswort password={tempPassword} onClose={() => setTempPassword(null)}>
+          <EinmalPasswort password={tempPassword} email={k.email} onClose={() => setTempPassword(null)}>
             Neues Passwort für <strong>{k.name}</strong>.
           </EinmalPasswort>
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Inline editor for login address + display name (PATCH /benutzer/:id/email and /name). Only
+ * changed fields are sent; a placeholder address starts empty and may stay empty.
+ */
+function KontoBearbeiten({
+  konto: k,
+  fokus,
+  onSaved,
+  onPartlySaved,
+  onCancel,
+}: {
+  konto: BenutzerUebersicht;
+  fokus: 'email' | 'name';
+  /** Everything saved — closes the editor. */
+  onSaved: (k: BenutzerUebersicht) => void;
+  /** E-mail saved but the name failed — update the list, keep the editor open. */
+  onPartlySaved: (k: BenutzerUebersicht) => void;
+  onCancel: () => void;
+}) {
+  const platzhalter = isPlaceholderEmail(k.email);
+  const [email, setEmail] = useState(platzhalter ? '' : k.email);
+  const [name, setName] = useState(k.name);
+  const [busy, setBusy] = useState(false);
+  const [emailFehler, setEmailFehler] = useState<string | null>(null);
+  const [nameFehler, setNameFehler] = useState<string | null>(null);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const emailId = `bv-email-${k.id}`;
+  const nameId = `bv-name-${k.id}`;
+
+  const emailNeu = email.trim().toLowerCase();
+  const emailGeaendert = emailNeu !== '' && emailNeu !== k.email;
+  const nameGeaendert = name.trim() !== k.name;
+
+  const speichern = async (ev: FormEvent) => {
+    ev.preventDefault();
+    if (!emailGeaendert && !nameGeaendert) {
+      onCancel();
+      return;
+    }
+    setBusy(true);
+    setEmailFehler(null);
+    setNameFehler(null);
+    setFehler(null);
+    let stand = k;
+    let fertig = false;
+    try {
+      if (emailGeaendert) {
+        try {
+          const body: BenutzerEmailUpdate = { email: emailNeu };
+          stand = await api<BenutzerUebersicht>(`/benutzer/${k.id}/email`, { method: 'PATCH', body });
+        } catch (err) {
+          // Format problems and a taken address belong under the field.
+          const inline =
+            fieldError(err, 'email') ?? (err instanceof HttpError && err.status === 409 ? err.message : null);
+          if (inline) {
+            setEmailFehler(inline);
+            document.getElementById(emailId)?.focus();
+            return;
+          }
+          throw err;
+        }
+      }
+      if (nameGeaendert) {
+        try {
+          const body: BenutzerNameUpdate = { name: name.trim() };
+          stand = await api<BenutzerUebersicht>(`/benutzer/${k.id}/name`, { method: 'PATCH', body });
+        } catch (err) {
+          const inline = fieldError(err, 'name');
+          if (inline) {
+            setNameFehler(inline);
+            document.getElementById(nameId)?.focus();
+            return;
+          }
+          throw err;
+        }
+      }
+      fertig = true;
+    } catch (err) {
+      setFehler(formError(err, []));
+    } finally {
+      setBusy(false);
+      if (fertig) onSaved(stand);
+      // A saved e-mail must show up in the list even if the name then failed.
+      else if (stand !== k) onPartlySaved(stand);
+    }
+  };
+
+  return (
+    <form className="bv-edit bv-full" onSubmit={speichern} aria-label={`${k.name} bearbeiten`}>
+      <div className="field">
+        <label htmlFor={emailId}>E-Mail-Adresse (Anmeldung)</label>
+        <input
+          id={emailId}
+          type="email"
+          inputMode="email"
+          required={!platzhalter}
+          maxLength={254}
+          autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder={platzhalter ? 'z. B. max@example.com' : undefined}
+          autoFocus={fokus === 'email'}
+          aria-invalid={emailFehler ? true : undefined}
+          aria-describedby={`${emailId}-hint`}
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setEmailFehler(null);
+          }}
+        />
+        <p id={`${emailId}-hint`} className={`field-hint ${emailFehler ? 'field-hint-error' : ''}`}>
+          {emailFehler ??
+            (platzhalter
+              ? 'Noch keine hinterlegt. Gilt ab der nächsten Anmeldung.'
+              : 'Gilt ab der nächsten Anmeldung.')}
+        </p>
+      </div>
+      <div className="field">
+        <label htmlFor={nameId}>Name</label>
+        <input
+          id={nameId}
+          required
+          minLength={2}
+          maxLength={100}
+          autoComplete="off"
+          autoCapitalize="words"
+          autoFocus={fokus === 'name'}
+          aria-invalid={nameFehler ? true : undefined}
+          aria-describedby={`${nameId}-hint`}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setNameFehler(null);
+          }}
+        />
+        <p id={`${nameId}-hint`} className={`field-hint ${nameFehler ? 'field-hint-error' : ''}`}>
+          {nameFehler ?? 'So sehen die anderen die Person.'}
+        </p>
+      </div>
+      {fehler && (
+        <div className="alert alert-error bv-edit-full" role="alert">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{fehler}</div>
+        </div>
+      )}
+      <div className="btn-row bv-edit-full">
+        <button className="btn" type="submit" disabled={busy} aria-busy={busy}>
+          <Icon name="save" />
+          {busy ? 'Speichert…' : 'Speichern'}
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={busy}>
+          Abbrechen
+        </button>
+      </div>
+    </form>
   );
 }
 

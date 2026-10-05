@@ -109,6 +109,34 @@ export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : 'Unbekannter Fehler';
 
 /**
+ * First server-side validation message for one body field (400 "Ungültige Eingabe" carries
+ * the flattened zod error as `details.fieldErrors`), or null.
+ */
+export function fieldError(err: unknown, field: string): string | null {
+  if (!(err instanceof HttpError) || err.status !== 400) return null;
+  const fe = (err.details as { fieldErrors?: Record<string, unknown> } | undefined)?.fieldErrors?.[field];
+  return Array.isArray(fe) && typeof fe[0] === 'string' ? fe[0] : null;
+}
+
+/**
+ * Message for the alert above a form: a 400 whose only problem is `field` is already shown
+ * inline under that field, so the alert gets null; anything else keeps its message.
+ */
+export function formError(err: unknown, inlineFields: readonly string[]): string | null {
+  if (err instanceof HttpError && err.status === 400) {
+    const fe = (err.details as { fieldErrors?: Record<string, unknown> } | undefined)?.fieldErrors ?? {};
+    const keys = Object.keys(fe);
+    if (keys.length > 0 && keys.every((k) => inlineFields.includes(k))) return null;
+    // Surface the first concrete message instead of the bare "Ungültige Eingabe".
+    for (const k of keys) {
+      const m = fieldError(err, k);
+      if (m) return m;
+    }
+  }
+  return errorMessage(err);
+}
+
+/**
  * "Anwesend" on a Fixtermin: add (PUT) or remove (DELETE) one Benutzer. Everyone may toggle
  * themselves, Ausbilder anyone. Resolves with the updated Termin.
  */

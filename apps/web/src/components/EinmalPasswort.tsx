@@ -1,3 +1,4 @@
+import { isPlaceholderEmail } from '@apas/shared';
 import { useState, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import './EinmalPasswort.css';
@@ -8,10 +9,13 @@ import './EinmalPasswort.css';
  */
 export function EinmalPasswort({
   password,
+  email,
   children,
   onClose,
 }: {
   password: string;
+  /** Login address of the account — shown so it can be passed on together with the password. */
+  email: string;
   /** What happened, e.g. "<b>Max</b> wurde hinzugefügt." */
   children: ReactNode;
   onClose: () => void;
@@ -33,7 +37,16 @@ export function EinmalPasswort({
       <div className="alert-body einmal-pw-body">
         <div>{children} Einmaliges Passwort — jetzt weitergeben, es wird nicht erneut angezeigt:</div>
         <code className="einmal-pw-code">{password}</code>
-        <div className="muted">Anmeldung auf der Startseite mit Name + diesem Passwort.</div>
+        {isPlaceholderEmail(email) ? (
+          <div className="muted">
+            Für dieses Konto ist noch keine E-Mail-Adresse hinterlegt — trag sie erst ein, damit sich die Person
+            anmelden kann.
+          </div>
+        ) : (
+          <div className="muted">
+            Anmeldung auf der Startseite mit <strong className="einmal-pw-email">{email}</strong> und diesem Passwort.
+          </div>
+        )}
         <div className="btn-row">
           <button type="button" className="btn btn-secondary btn-small" onClick={copy}>
             <Icon name={copied ? 'check' : 'copy'} />

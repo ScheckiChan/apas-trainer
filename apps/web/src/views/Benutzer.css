@@ -28,9 +28,38 @@ h2 + .bv-intro {
   margin: 0;
 }
 
+.bv-filter {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Toggle: pressed state is raised + bordered in ink, not colour alone (plus the check icon). */
+.bv .bv-filter-ohne {
+  white-space: nowrap;
+}
+
+.bv .bv-filter-ohne > .icon {
+  color: var(--warn-text);
+}
+
+.bv .bv-filter-aktiv {
+  background: var(--surface-sunk);
+  border-color: var(--ink);
+}
+
+.bv .bv-filter-aktiv > .icon {
+  color: inherit;
+}
+
 .bv-suche {
   position: relative;
-  width: min(100%, 18rem);
+  flex: 1 1 18rem;
+  max-width: 20rem;
 }
 
 .bv-suche > .icon {
@@ -47,7 +76,7 @@ h2 + .bv-intro {
 }
 
 .bv-table {
-  --bv-cols: minmax(9rem, 1.4fr) minmax(7rem, 1fr) minmax(6rem, 1fr) 10.5rem 6rem;
+  --bv-cols: minmax(12rem, 1.8fr) minmax(7rem, 1fr) minmax(6rem, 1fr) 10.5rem 9rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -92,12 +121,83 @@ h2 + .bv-intro {
 
 .bv-name {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bv-name-zeile {
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-2);
   min-width: 0;
   font-weight: 600;
+}
+
+/* Login address under the name; long addresses wrap anywhere instead of widening the row. */
+.bv-mail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.bv-email {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--text-sm);
+  color: var(--muted);
   overflow-wrap: anywhere;
+}
+
+.bv-email > .icon {
+  flex-shrink: 0;
+  margin-top: 0.1em;
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.bv-email > span {
+  min-width: 0;
+}
+
+/* Migration placeholder: icon + wording + weight, the warn tint only reinforces it. */
+.bv-email-fehlt {
+  color: var(--warn-text);
+  font-weight: 600;
+}
+
+.bv .bv-email-eintragen {
+  margin-top: var(--space-1);
+}
+
+/* Inline editor for E-Mail + Name below the row. */
+.bv-edit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+  padding: var(--space-3);
+  margin-bottom: var(--space-1);
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.bv-edit .field + .field {
+  margin-top: 0;
+}
+
+.bv-edit-full {
+  grid-column: 1 / -1;
 }
 
 /* Wide: FF and Trupp are their own columns. */
@@ -207,17 +307,35 @@ h2 + .bv-intro {
     display: none;
   }
 
+  .bv-filter {
+    justify-content: flex-start;
+  }
+
+  .bv-suche {
+    max-width: none;
+  }
+
   .bv-row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       'name actions'
-      'meta actions'
+      'mail mail'
+      'meta meta'
       'rolle rolle';
     padding: var(--space-3) var(--space-4);
   }
 
+  /* The name cell splits: name next to the actions, the address below at full width. */
   .bv-name {
+    display: contents;
+  }
+
+  .bv-name-zeile {
     grid-area: name;
+  }
+
+  .bv-mail {
+    grid-area: mail;
   }
 
   .bv-meta {
@@ -239,6 +357,10 @@ h2 + .bv-intro {
 
   .bv-rolle select {
     max-width: 16rem;
+  }
+
+  .bv-edit {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .bv-actions {

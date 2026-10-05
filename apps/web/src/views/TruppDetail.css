@@ -132,6 +132,11 @@
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+/* E-Mail + Name, then FF + buttons (stacks to one column below 720px). */
+.gd-add-form-neu {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .gd-add-intro {
   grid-column: 1 / -1;
   margin: 0;
