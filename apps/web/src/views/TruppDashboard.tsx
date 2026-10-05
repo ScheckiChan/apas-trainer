@@ -2,6 +2,7 @@ import { ROLLEN, type Trupp, type TruppSummary } from '@apas/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
+import { Icon } from '../components/Icon';
 import { PushButton } from '../components/PushButton';
 import { api, clearToken, errorMessage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
@@ -34,25 +35,40 @@ export function TruppDashboard() {
     <>
       <AppHeader>
         <PushButton auth="leiter" />
-        <button type="button" className="btn btn-ghost btn-small" onClick={logout}>
-          Abmelden
+        <button type="button" className="btn btn-ghost btn-small" onClick={logout} title="Abmelden">
+          <Icon name="log-out" />
+          <span className="hide-sm">Abmelden</span>
         </button>
       </AppHeader>
       <main className="page stack">
-        <h1 className="dashboard-title">Trupps</h1>
+        <h1>Trupps</h1>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="alert alert-error">
+            <Icon name="triangle-alert" />
+            <div className="alert-body">{error}</div>
+          </div>
+        )}
         {trupps === null && !error && <p className="muted">Lade…</p>}
-        {empty && <div className="card muted">Noch kein Trupp angelegt.</div>}
+        {empty && <p className="muted">Noch kein Trupp angelegt.</p>}
 
         {trupps && trupps.length > 0 && (
-          <ul className="dashboard-list">
-            {trupps.map((t) => (
-              <li key={t.id}>
-                <TruppRow trupp={t} />
-              </li>
-            ))}
-          </ul>
+          <div className="tl">
+            <div className="tl-head" aria-hidden="true">
+              <span>Trupp</span>
+              <span>Rollen</span>
+              <span>Teilnehmer</span>
+              <span>Bereit</span>
+              <span>Prüfung</span>
+            </div>
+            <ul className="tl-list">
+              {trupps.map((t) => (
+                <li key={t.id}>
+                  <TruppRow trupp={t} />
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {trupps !== null &&
@@ -64,7 +80,8 @@ export function TruppDashboard() {
           ) : (
             <div>
               <button type="button" className="btn btn-secondary btn-small" onClick={() => setShowCreate(true)}>
-                + Neuen Trupp erstellen
+                <Icon name="plus" />
+                Neuen Trupp erstellen
               </button>
             </div>
           ))}
@@ -73,33 +90,36 @@ export function TruppDashboard() {
   );
 }
 
+/** One table row with the real counts inline. Collapses to three lines on phones. */
 function TruppRow({ trupp: t }: { trupp: TruppSummary }) {
   const days = t.pruefungstermin ? daysUntil(t.pruefungstermin) : null;
   const urgent = days !== null && days >= 0 && days <= 14;
   const rollenKomplett = t.rollenBesetzt === ROLLEN.length;
   return (
-    <Link to={`/trupps/${t.id}`} className="card dashboard-card">
-      <div className="dashboard-card-top">
-        <h2>{t.name}</h2>
-        <span className={`badge ${urgent ? 'badge-red' : ''}`}>{countdownLabel(t.pruefungstermin)}</span>
-      </div>
-      <div className="dashboard-card-stats">
-        <span className={rollenKomplett ? '' : 'dashboard-warn'}>
-          <strong>
+    <Link to={`/trupps/${t.id}`} className="tl-row">
+      <span className="tl-name">{t.name}</span>
+      <span className="tl-stats">
+        <span className={`tl-cell ${rollenKomplett ? 'tl-ok' : 'tl-warn'}`}>
+          <span className="num">
             {t.rollenBesetzt}/{ROLLEN.length}
-          </strong>{' '}
-          Rollen besetzt
+          </span>
+          <span className="tl-lbl">Rollen besetzt</span>
         </span>
-        <span>
-          <strong>{t.teilnehmerCount}</strong> Teilnehmer
+        <span className="tl-cell">
+          <span className="num">{t.teilnehmerCount}</span>
+          <span className="tl-lbl">Teilnehmer</span>
         </span>
-        <span>
-          <span className="ampel ampel-gruen" /> <strong>{t.bereitCount}</strong> bereit
+        <span className="tl-cell">
+          <Icon name="circle-check" size="1.1em" className="tl-bereit-icon" />
+          <span className="num">{t.bereitCount}</span>
+          <span className="tl-lbl">bereit</span>
         </span>
-      </div>
-      <div className="muted dashboard-card-date">
-        {t.pruefungstermin ? `Prüfung am ${formatDate(t.pruefungstermin)}` : 'Prüfungstermin noch offen'}
-      </div>
+      </span>
+      <span className="tl-pruefung">
+        <span className={`num ${urgent ? 'badge badge-accent' : 'tl-countdown'}`}>{countdownLabel(t.pruefungstermin)}</span>
+        {t.pruefungstermin && <span className="tl-date num">am {formatDate(t.pruefungstermin)}</span>}
+      </span>
+      <Icon name="chevron-right" className="tl-chev" />
     </Link>
   );
 }
@@ -130,7 +150,12 @@ function CreateTrupp({ onCreated, onCancel }: { onCreated: (t: Trupp) => void; o
   return (
     <form className="card stack" onSubmit={submit}>
       <h2>Neuen Trupp erstellen</h2>
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{error}</div>
+        </div>
+      )}
       <div className="dashboard-create-fields">
         <div>
           <label htmlFor="trupp-name">Name</label>
@@ -154,8 +179,8 @@ function CreateTrupp({ onCreated, onCancel }: { onCreated: (t: Trupp) => void; o
         </div>
       </div>
       <div className="btn-row">
-        <button className="btn" type="submit" disabled={busy}>
-          Trupp erstellen
+        <button className="btn" type="submit" disabled={busy} aria-busy={busy}>
+          {busy ? 'Erstelle…' : 'Trupp erstellen'}
         </button>
         {onCancel && (
           <button type="button" className="btn btn-ghost" onClick={onCancel}>

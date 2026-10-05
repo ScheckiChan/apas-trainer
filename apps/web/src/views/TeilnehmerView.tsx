@@ -11,10 +11,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
+import { Icon } from '../components/Icon';
 import { PushButton } from '../components/PushButton';
 import { RolleSelect, RollenAbdeckung, rolleLabel, saveRolle } from '../components/Rollen';
 import { api, clearToken, errorMessage } from '../lib/api';
-import { countdownLabel, formatDate } from '../lib/format';
+import { countdownLabel, daysUntil, formatDate } from '../lib/format';
 import { Calendar } from './Calendar';
 import { Stations } from './Stations';
 import './TeilnehmerView.css';
@@ -22,6 +23,12 @@ import './TeilnehmerView.css';
 const TABS = ['checkliste', 'trupp', 'kalender', 'stationen'] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (v: string | null): v is Tab => TABS.includes(v as Tab);
+
+const urgentCountdown = (termin: string | null | undefined): boolean => {
+  if (!termin) return false;
+  const days = daysUntil(termin);
+  return days >= 0 && days <= 14;
+};
 
 export function TeilnehmerView() {
   const navigate = useNavigate();
@@ -78,27 +85,34 @@ export function TeilnehmerView() {
     <>
       <AppHeader>
         <PushButton auth="teilnehmer" />
-        <button type="button" className="btn btn-ghost btn-small" onClick={logout}>
-          Abmelden
+        <button type="button" className="btn btn-ghost btn-small" onClick={logout} title="Abmelden">
+          <Icon name="log-out" />
+          <span className="hide-sm">Abmelden</span>
         </button>
       </AppHeader>
       <main className="page stack">
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="alert alert-error">
+            <Icon name="triangle-alert" />
+            <div className="alert-body">{error}</div>
+          </div>
+        )}
         {!me || !trupp ? (
           !error && <p className="muted">Lade…</p>
         ) : (
           <>
-            <section className="tv-hero">
+            <section className="tv-head">
               <div>
-                <div className="tv-hello">Servus, {me.name.split(' ')[0]}!</div>
                 <h1>{trupp.name}</h1>
-                <div className="tv-meta">
-                  {me.ff} · {rolleLabel(me.rolle)}
-                </div>
+                <p className="tv-meta">
+                  Servus, {me.name.split(' ')[0]} — {me.ff} · {rolleLabel(me.rolle)}
+                </p>
               </div>
               <div className="tv-countdown">
-                <strong>{countdownLabel(trupp.pruefungstermin)}</strong>
-                {trupp.pruefungstermin && <span>Prüfung am {formatDate(trupp.pruefungstermin)}</span>}
+                <strong className={`num ${urgentCountdown(trupp.pruefungstermin) ? 'tv-urgent' : ''}`}>
+                  {countdownLabel(trupp.pruefungstermin)}
+                </strong>
+                {trupp.pruefungstermin && <span className="num">Prüfung am {formatDate(trupp.pruefungstermin)}</span>}
               </div>
             </section>
 
@@ -143,7 +157,10 @@ export function TeilnehmerView() {
                   </p>
                 )}
                 {checklistAmpel(me.rolle, me.checkliste) === 'gruen' && (
-                  <div className="alert alert-ok">Alle Voraussetzungen erfüllt — du bist startklar!</div>
+                  <div className="alert alert-ok">
+                    <Icon name="circle-check" />
+                    <div className="alert-body">Alle Voraussetzungen erfüllt — du bist startklar!</div>
+                  </div>
                 )}
               </section>
             )}
@@ -197,7 +214,12 @@ function TruppTab({
         Die Rollen könnt ihr jederzeit gemeinsam umstellen — jede Rolle darf auch mehrfach besetzt sein
         (Ergänzungsteilnehmer).
       </p>
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{error}</div>
+        </div>
+      )}
       {!rows ? (
         !error && <p className="muted">Lade…</p>
       ) : (

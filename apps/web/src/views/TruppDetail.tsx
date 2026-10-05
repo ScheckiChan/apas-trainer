@@ -12,9 +12,10 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
+import { Icon } from '../components/Icon';
 import { RolleSelect, RollenAbdeckung, saveRolle } from '../components/Rollen';
 import { api, errorMessage } from '../lib/api';
-import { countdownLabel } from '../lib/format';
+import { countdownLabel, daysUntil, formatDate } from '../lib/format';
 import './TruppDetail.css';
 
 export function TruppDetail() {
@@ -78,7 +79,10 @@ export function TruppDetail() {
       <>
         <AppHeader backTo="/trupps" />
         <main className="page">
-          <div className="alert alert-error">{error}</div>
+          <div className="alert alert-error">
+            <Icon name="triangle-alert" />
+            <div className="alert-body">{error}</div>
+          </div>
         </main>
       </>
     );
@@ -93,6 +97,8 @@ export function TruppDetail() {
   }
 
   const bereit = teilnehmer.filter((t) => checklistAmpel(t.rolle, t.checkliste) === 'gruen').length;
+  const days = trupp.pruefungstermin ? daysUntil(trupp.pruefungstermin) : null;
+  const urgent = days !== null && days >= 0 && days <= 14;
 
   return (
     <>
@@ -101,29 +107,36 @@ export function TruppDetail() {
         <div className="gd-head">
           <div>
             <h1>{trupp.name}</h1>
-            <span className="badge">{countdownLabel(trupp.pruefungstermin)}</span>
+            <p className="gd-meta">
+              <span className={`num ${urgent ? 'badge badge-accent' : 'gd-countdown'}`}>
+                {countdownLabel(trupp.pruefungstermin)}
+              </span>
+              {trupp.pruefungstermin && <span className="num">Prüfung am {formatDate(trupp.pruefungstermin)}</span>}
+            </p>
           </div>
           <div className="btn-row">
             <Link className="btn" to={`/trupps/${trupp.id}/kalender`}>
-              📅 Kalender
+              <Icon name="calendar-days" />
+              Kalender
             </Link>
             <Link className="btn btn-secondary" to={`/trupps/${trupp.id}/stationen`}>
+              <Icon name="book-open-check" />
               Stationen
             </Link>
           </div>
         </div>
 
-        <div className="gd-grid">
-          <PruefungsterminEditor trupp={trupp} onSaved={setTrupp} />
-          <InvitePanel trupp={trupp} onRegenerated={setTrupp} />
-        </div>
-
         <section className="card">
           <div className="gd-section-head">
-            <h2>Teilnehmer ({teilnehmer.length})</h2>
-            <span className="muted">
-              <span className="ampel ampel-gruen" /> {bereit} von {teilnehmer.length} bereit
-            </span>
+            <h2>
+              Teilnehmer <span className="gd-count num">{teilnehmer.length}</span>
+            </h2>
+            {teilnehmer.length > 0 && (
+              <span className="gd-bereit num">
+                <Icon name="circle-check" />
+                {bereit} von {teilnehmer.length} bereit
+              </span>
+            )}
           </div>
           {teilnehmer.length > 0 && <RollenAbdeckung teilnehmer={teilnehmer} />}
           <AddTeilnehmer
@@ -147,18 +160,23 @@ export function TruppDetail() {
                   <ChecklistToggles teilnehmer={t} compact onToggle={(item) => toggle(t, item)} />
                   <button
                     type="button"
-                    className="btn btn-ghost btn-small gd-remove"
+                    className="btn btn-ghost btn-icon gd-remove"
                     onClick={() => remove(t)}
                     title="Aus dem Trupp entfernen"
                     aria-label={`${t.name} entfernen`}
                   >
-                    ✕
+                    <Icon name="trash-2" />
                   </button>
                 </li>
               ))}
             </ul>
           )}
         </section>
+
+        <div className="gd-grid">
+          <PruefungsterminEditor trupp={trupp} onSaved={setTrupp} />
+          <InvitePanel trupp={trupp} onRegenerated={setTrupp} />
+        </div>
 
         <RessourcenPanel truppId={trupp.id} />
       </main>
@@ -215,24 +233,34 @@ function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Tei
     <div className="gd-add">
       {created && (
         <div className="alert alert-ok gd-add-result" role="status">
-          <div>
-            Zugang für <strong>{created.teilnehmer.name}</strong>: Passwort{' '}
-            <code className="gd-temp-pw">{created.tempPassword}</code> — jetzt weitergeben, wird nicht erneut
-            angezeigt. Anmeldung über den Einladungslink → „Anmelden" mit Name + Passwort.
-          </div>
-          <div className="btn-row">
-            <button type="button" className="btn btn-secondary btn-small" onClick={copy}>
-              {copied ? '✓ Kopiert' : 'Passwort kopieren'}
-            </button>
-            <button type="button" className="btn btn-ghost btn-small" onClick={() => setCreated(null)}>
-              Schließen
-            </button>
+          <Icon name="circle-check" />
+          <div className="alert-body gd-add-body">
+            <div>
+              <strong>{created.teilnehmer.name}</strong> wurde hinzugefügt. Einmaliges Passwort — jetzt weitergeben,
+              es wird nicht erneut angezeigt:
+            </div>
+            <code className="gd-temp-pw">{created.tempPassword}</code>
+            <div className="muted">Anmeldung über den Einladungslink → „Anmelden" mit Name + Passwort.</div>
+            <div className="btn-row">
+              <button type="button" className="btn btn-secondary btn-small" onClick={copy}>
+                <Icon name={copied ? 'check' : 'copy'} />
+                {copied ? 'Kopiert' : 'Passwort kopieren'}
+              </button>
+              <button type="button" className="btn btn-ghost btn-small" onClick={() => setCreated(null)}>
+                Schließen
+              </button>
+            </div>
           </div>
         </div>
       )}
       {open ? (
         <form className="gd-add-form" onSubmit={submit}>
-          {error && <div className="alert alert-error gd-add-error">{error}</div>}
+          {error && (
+            <div className="alert alert-error gd-add-error">
+              <Icon name="triangle-alert" />
+              <div className="alert-body">{error}</div>
+            </div>
+          )}
           <input
             required
             minLength={2}
@@ -253,8 +281,8 @@ function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Tei
             onChange={(e) => setFf(e.target.value)}
           />
           <div className="btn-row">
-            <button className="btn" type="submit" disabled={busy}>
-              Hinzufügen
+            <button className="btn" type="submit" disabled={busy} aria-busy={busy}>
+              {busy ? 'Füge hinzu…' : 'Hinzufügen'}
             </button>
             <button
               type="button"
@@ -270,7 +298,8 @@ function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Tei
         </form>
       ) : (
         <button type="button" className="btn btn-secondary btn-small" onClick={() => setOpen(true)}>
-          + Person hinzufügen
+          <Icon name="user-plus" />
+          Person hinzufügen
         </button>
       )}
     </div>
@@ -280,7 +309,7 @@ function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Tei
 function PruefungsterminEditor({ trupp, onSaved }: { trupp: Trupp; onSaved: (trupp: Trupp) => void }) {
   const [value, setValue] = useState(trupp.pruefungstermin ?? '');
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const dirty = value !== (trupp.pruefungstermin ?? '');
 
   const save = async (e: FormEvent) => {
@@ -294,9 +323,9 @@ function PruefungsterminEditor({ trupp, onSaved }: { trupp: Trupp; onSaved: (tru
         body: { pruefungstermin: value || null },
       });
       onSaved(updated);
-      setMsg('Gespeichert');
+      setMsg({ ok: true, text: 'Gespeichert' });
     } catch (err) {
-      setMsg(errorMessage(err));
+      setMsg({ ok: false, text: errorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -305,12 +334,25 @@ function PruefungsterminEditor({ trupp, onSaved }: { trupp: Trupp; onSaved: (tru
   return (
     <form className="card stack" onSubmit={save}>
       <h2>Prüfungstermin</h2>
-      <input type="date" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Prüfungstermin" />
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setMsg(null);
+        }}
+        aria-label="Prüfungstermin"
+      />
       <div className="btn-row">
-        <button className="btn" type="submit" disabled={busy || !dirty}>
+        <button className="btn btn-secondary" type="submit" disabled={busy || !dirty} aria-busy={busy}>
           Speichern
         </button>
-        {msg && <span className="muted">{msg}</span>}
+        {msg && (
+          <span className={`gd-msg ${msg.ok ? 'gd-msg-ok' : 'gd-msg-error'}`} role="status">
+            <Icon name={msg.ok ? 'check' : 'triangle-alert'} />
+            {msg.text}
+          </span>
+        )}
       </div>
     </form>
   );
@@ -322,7 +364,7 @@ function InvitePanel({ trupp, onRegenerated }: { trupp: Trupp; onRegenerated: (t
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    QRCode.toDataURL(link, { width: 220, margin: 1, color: { dark: '#1d1f24', light: '#ffffff' } })
+    QRCode.toDataURL(link, { width: 220, margin: 1, color: { dark: '#221716', light: '#ffffff' } })
       .then(setQr)
       .catch(() => setQr(null));
   }, [link]);
@@ -353,9 +395,11 @@ function InvitePanel({ trupp, onRegenerated }: { trupp: Trupp; onRegenerated: (t
         <input readOnly value={link} onFocus={(e) => e.target.select()} aria-label="Einladungslink" />
         <div className="btn-row">
           <button type="button" className="btn btn-secondary btn-small" onClick={copy}>
-            {copied ? '✓ Kopiert' : 'Kopieren'}
+            <Icon name={copied ? 'check' : 'copy'} />
+            {copied ? 'Kopiert' : 'Kopieren'}
           </button>
           <button type="button" className="btn btn-ghost btn-small" onClick={regenerate}>
+            <Icon name="refresh-cw" />
             Neu erzeugen
           </button>
         </div>
@@ -408,7 +452,12 @@ function RessourcenPanel({ truppId }: { truppId: string }) {
     <section className="card stack">
       <h2>Ressourcen</h2>
       <p className="muted">Fahrzeuge, Übungsgelände oder Geräte, die bei Terminen gebucht werden können.</p>
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{error}</div>
+        </div>
+      )}
       {list.length > 0 && (
         <ul className="gd-res-list">
           {list.map((r) => (
@@ -417,17 +466,30 @@ function RessourcenPanel({ truppId }: { truppId: string }) {
                 <strong>{r.name}</strong>
                 {r.standort && <span className="muted"> · {r.standort}</span>}
               </div>
-              <button type="button" className="btn btn-ghost btn-small" onClick={() => remove(r)} aria-label="Löschen">
-                ✕
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon gd-remove"
+                onClick={() => remove(r)}
+                aria-label={`${r.name} löschen`}
+                title="Ressource löschen"
+              >
+                <Icon name="trash-2" />
               </button>
             </li>
           ))}
         </ul>
       )}
       <form className="gd-res-form" onSubmit={add}>
-        <input required placeholder="Name, z. B. HLF Fels" value={name} onChange={(e) => setName(e.target.value)} />
-        <input placeholder="Standort" value={standort} onChange={(e) => setStandort(e.target.value)} />
+        <input
+          required
+          placeholder="Name, z. B. HLF Fels"
+          aria-label="Name der Ressource"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input placeholder="Standort" aria-label="Standort" value={standort} onChange={(e) => setStandort(e.target.value)} />
         <button className="btn btn-secondary" type="submit">
+          <Icon name="plus" />
           Hinzufügen
         </button>
       </form>

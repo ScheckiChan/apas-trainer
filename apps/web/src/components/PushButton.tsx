@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { errorMessage } from '../lib/api';
 import { enablePush, pushSupported } from '../lib/push';
+import { Icon } from './Icon';
 
 /** "Erinnerungen aktivieren" — subscribes this device for Termin reminders. */
 export function PushButton({ auth }: { auth: 'leiter' | 'teilnehmer' }) {
@@ -23,13 +24,12 @@ export function PushButton({ auth }: { auth: 'leiter' | 'teilnehmer' }) {
   return (
     <button
       type="button"
-      className="btn btn-ghost btn-small"
+      className={`btn btn-ghost btn-small ${state === 'on' ? 'push-on' : ''}`}
       onClick={onClick}
       disabled={state === 'busy'}
       title={state === 'on' ? 'Push-Erinnerungen sind aktiv' : 'Push-Erinnerungen vor Terminen aktivieren'}
-      aria-label={state === 'on' ? 'Erinnerungen an' : 'Erinnerungen aktivieren'}
     >
-      {state === 'on' ? '🔔' : '🔕'}
+      <Icon name={state === 'on' ? 'bell-ring' : 'bell'} />
       <span className="hide-sm">{state === 'on' ? 'Erinnerungen an' : 'Erinnerungen aktivieren'}</span>
     </button>
   );

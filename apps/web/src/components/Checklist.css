@@ -1,57 +1,117 @@
 .checklist {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
+/* ok = solid green tint + check; offen = neutral outline + empty circle; N/A = dashed, struck. */
 .check {
-  display: inline-flex;
-  flex-direction: column;
+  display: inline-grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'icon label'
+    'icon state';
   align-items: center;
-  min-width: 5.5rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  border: 2px solid transparent;
+  column-gap: var(--space-2);
+  min-width: 8.5rem;
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
   font: inherit;
-  font-weight: 700;
+  text-align: left;
   cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.check-icon {
+  grid-area: icon;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.check-label {
+  grid-area: label;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .check small {
+  grid-area: state;
+  font-size: var(--text-xs);
   font-weight: 500;
-  font-size: 0.75rem;
+  color: var(--muted);
 }
 
 .check:disabled {
   cursor: default;
 }
 
-.check-ok {
-  background: #e8f5e9;
-  border-color: var(--green);
-  color: #1b5e20;
+.check-offen .check-icon {
+  color: var(--ampel-rot);
 }
 
-.check-offen {
-  background: var(--red-soft);
-  border-color: var(--red);
-  color: var(--red-dark);
+.check-offen:not(:disabled):hover {
+  background: var(--surface-sunk);
+}
+
+.check-ok {
+  background: var(--success-subtle);
+  border-color: color-mix(in oklch, var(--success) 45%, transparent);
+}
+
+.check-ok .check-icon,
+.check-ok small {
+  color: var(--success);
 }
 
 .check-na {
-  background: var(--grey-light);
-  color: #9ca3af;
-  border: 2px dashed #cbd0d6;
+  grid-template-areas: 'label' 'state';
+  grid-template-columns: 1fr;
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
   cursor: not-allowed;
 }
 
+.check-na .check-label {
+  text-decoration: line-through;
+  font-weight: 500;
+}
+
+/* Compact (one row per Teilnehmer in the Leiter view): icon + label, state via icon only. */
+.checklist-compact {
+  gap: var(--space-1);
+}
+
 .checklist-compact .check {
-  min-width: 3.6rem;
-  padding: 0.2rem 0.4rem;
-  font-size: 0.8rem;
-  border-width: 1px;
+  display: inline-flex;
+  min-width: 0;
+  min-height: 36px;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.checklist-compact .check-icon {
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .checklist-compact .check small {
-  font-size: 0.68rem;
+  display: none;
+}
+
+.checklist-compact .check-na small {
+  display: inline;
+}
+
+@media (pointer: coarse) {
+  .checklist-compact .check {
+    min-height: var(--touch);
+  }
 }

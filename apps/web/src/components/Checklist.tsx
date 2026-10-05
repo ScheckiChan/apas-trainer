@@ -7,6 +7,7 @@ import {
   type ChecklistItem,
   type Teilnehmer,
 } from '@apas/shared';
+import { Icon, type IconName } from './Icon';
 import './Checklist.css';
 
 const AMPEL_TITLE: Record<Ampel, string> = {
@@ -15,9 +16,20 @@ const AMPEL_TITLE: Record<Ampel, string> = {
   rot: 'Noch offen',
 };
 
+// Shape carries the state as well as colour (check / dashed / empty), for colour-blind users.
+const AMPEL_ICON: Record<Ampel, IconName> = {
+  gruen: 'circle-check',
+  gelb: 'circle-dashed',
+  rot: 'circle',
+};
+
 export function AmpelDot({ teilnehmer }: { teilnehmer: Teilnehmer }) {
   const a = checklistAmpel(teilnehmer.rolle, teilnehmer.checkliste);
-  return <span className={`ampel ampel-${a}`} title={AMPEL_TITLE[a]} aria-label={AMPEL_TITLE[a]} />;
+  return (
+    <span className={`ampel ampel-${a}`} title={AMPEL_TITLE[a]} role="img" aria-label={AMPEL_TITLE[a]}>
+      <Icon name={AMPEL_ICON[a]} />
+    </span>
+  );
 }
 
 /**
@@ -41,7 +53,7 @@ export function ChecklistToggles({
         if (!isChecklistItemRequired(teilnehmer.rolle, item)) {
           return (
             <span key={item} className="check check-na" title="Für GKDT nicht erforderlich">
-              {CHECKLIST_LABELS[item]}
+              <span className="check-label">{CHECKLIST_LABELS[item]}</span>
               <small>N/A</small>
             </span>
           );
@@ -57,8 +69,9 @@ export function ChecklistToggles({
             aria-pressed={ok}
             title={`${CHECKLIST_LABELS[item]}: ${ok ? 'ok' : 'offen'}`}
           >
-            {CHECKLIST_LABELS[item]}
-            <small>{ok ? '✓ ok' : 'offen'}</small>
+            <Icon name={ok ? 'circle-check' : 'circle'} className="check-icon" />
+            <span className="check-label">{CHECKLIST_LABELS[item]}</span>
+            <small>{ok ? 'ok' : 'offen'}</small>
           </button>
         );
       })}

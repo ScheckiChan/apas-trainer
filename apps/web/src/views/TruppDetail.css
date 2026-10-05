@@ -1,47 +1,75 @@
 .gd-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
+  align-items: flex-end;
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
 .gd-head h1 {
-  font-size: 1.5rem;
-  margin-bottom: 0.3rem;
+  margin-bottom: var(--space-1);
+}
+
+.gd-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.gd-countdown {
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .gd-grid {
   display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-4);
 }
 
 .gd-section-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 1rem;
+  gap: var(--space-2) var(--space-4);
   flex-wrap: wrap;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
-.gd-invite {
+.gd-section-head h2 {
+  margin: 0;
   display: flex;
-  gap: 1rem;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.gd-count {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.gd-bereit {
+  display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
-.gd-invite > .stack {
-  flex: 1;
-  min-width: 0;
+.gd-bereit .icon {
+  color: var(--ampel-gruen);
 }
 
-.gd-qr {
-  border: 1px solid var(--grey-light);
-  border-radius: 8px;
-  flex-shrink: 0;
+.gd-section-head + .rollen-abdeckung {
+  margin-bottom: var(--space-3);
 }
+
+/* ---------- Teilnehmer rows ---------- */
 
 .gd-tn-list {
   list-style: none;
@@ -50,15 +78,15 @@
 }
 
 .gd-tn {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(8rem, 1fr) auto auto auto;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 0;
-  border-top: 1px solid var(--grey-light);
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
 }
 
 .gd-tn-main {
-  flex: 1;
   min-width: 0;
 }
 
@@ -66,7 +94,7 @@
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-2);
 }
 
 .gd-tn .muted {
@@ -75,13 +103,94 @@
   white-space: nowrap;
 }
 
-.gd-section-head + .rollen-abdeckung {
-  margin-bottom: 0.5rem;
+.gd-remove {
+  color: var(--muted);
 }
 
-.gd-remove {
-  color: var(--grey);
+.gd-remove:hover {
+  color: var(--danger);
 }
+
+/* ---------- Person hinzufügen + one-time password ---------- */
+
+.gd-add {
+  margin-bottom: var(--space-3);
+}
+
+.gd-add-result {
+  margin-bottom: var(--space-3);
+}
+
+.gd-add-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.gd-temp-pw {
+  font-family: var(--font-sans);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.gd-add-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.gd-add-error {
+  grid-column: 1 / -1;
+}
+
+/* ---------- Prüfungstermin / Einladung ---------- */
+
+.gd-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.gd-msg-ok {
+  color: var(--success);
+}
+
+.gd-msg-error {
+  color: var(--danger);
+}
+
+.gd-invite {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.gd-invite > .stack {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The QR stays dark-on-white in both schemes so every camera reads it. */
+.gd-qr {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+
+/* ---------- Ressourcen ---------- */
 
 .gd-res-list {
   list-style: none;
@@ -93,71 +202,58 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.4rem 0;
-  border-top: 1px solid var(--grey-light);
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-top: 1px solid var(--border);
 }
 
 .gd-res-form {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
-.gd-add {
-  margin-bottom: 0.75rem;
-}
+@media (max-width: 860px) {
+  .gd-tn {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'ampel main remove'
+      '. rolle rolle'
+      '. checks checks';
+    row-gap: var(--space-2);
+    padding: var(--space-3) 0;
+  }
 
-.gd-add-result {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
+  .gd-tn > .ampel {
+    grid-area: ampel;
+  }
 
-.gd-temp-pw {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  background: #fff;
-  border: 1px solid #a5d6a7;
-  border-radius: 6px;
-  padding: 0.05rem 0.4rem;
-  user-select: all;
-  white-space: nowrap;
-}
+  .gd-tn-main {
+    grid-area: main;
+  }
 
-.gd-add-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 0.5rem;
-  align-items: center;
-}
+  .gd-tn .rolle-select {
+    grid-area: rolle;
+    justify-self: start;
+    max-width: 100%;
+  }
 
-.gd-add-error {
-  grid-column: 1 / -1;
+  .gd-tn .checklist {
+    grid-area: checks;
+  }
+
+  .gd-tn .gd-remove {
+    grid-area: remove;
+  }
 }
 
 @media (max-width: 720px) {
-  .gd-add-form {
+  .gd-add-form,
+  .gd-res-form {
     grid-template-columns: 1fr;
   }
 
   .gd-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .gd-tn {
-    flex-wrap: wrap;
-  }
-
-  .gd-tn .checklist {
-    order: 3;
-    width: 100%;
-    padding-left: 1.55rem;
-  }
-
-  .gd-res-form {
     grid-template-columns: 1fr;
   }
 }

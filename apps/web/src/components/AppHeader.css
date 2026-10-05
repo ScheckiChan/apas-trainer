@@ -1,7 +1,6 @@
 .app-header {
-  background: var(--dark);
-  color: #fff;
-  border-bottom: 3px solid var(--red);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -9,53 +8,68 @@
 }
 
 .app-header-inner {
-  max-width: 960px;
+  max-width: var(--page-max);
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 1rem;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: var(--space-1) var(--space-4);
 }
 
 .app-header-brand {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: #fff;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  color: var(--ink);
   text-decoration: none;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
 .app-header-brand img {
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .app-header-back {
-  color: #fff;
-  text-decoration: none;
-  font-size: 1.3rem;
-  padding: 0 0.25rem;
+  margin-left: calc(-1 * var(--space-2));
+  color: var(--ink);
 }
 
 .app-header-actions {
   margin-left: auto;
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-1);
   align-items: center;
 }
 
 .app-header-actions .btn-ghost {
-  color: #fff;
+  color: var(--muted);
 }
 
 .app-header-actions .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
 }
 
-@media (max-width: 520px) {
+.app-header-actions .push-on {
+  color: var(--success);
+}
+
+@media (max-width: 560px) {
   .hide-sm {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .app-header-actions .btn-small {
+    width: var(--touch);
+    min-height: var(--touch);
+    padding: 0;
   }
 }

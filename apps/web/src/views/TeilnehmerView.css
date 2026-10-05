@@ -1,28 +1,19 @@
-.tv-hero {
-  background: linear-gradient(135deg, var(--dark) 0%, var(--dark-2) 60%, var(--red-dark) 100%);
-  color: #fff;
-  border-radius: var(--radius);
-  padding: 1.25rem;
+.tv-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 1rem;
+  gap: var(--space-3) var(--space-4);
   flex-wrap: wrap;
 }
 
-.tv-hero h1 {
-  font-size: 1.4rem;
-  margin: 0.15rem 0;
-}
-
-.tv-hello {
-  opacity: 0.8;
-  font-size: 0.9rem;
+.tv-head h1 {
+  margin-bottom: var(--space-1);
 }
 
 .tv-meta {
-  opacity: 0.85;
-  font-size: 0.9rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 .tv-countdown {
@@ -33,45 +24,58 @@
 }
 
 .tv-countdown strong {
-  font-size: 1.35rem;
-  color: #ffcdd2;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+}
+
+.tv-countdown .tv-urgent {
+  color: var(--accent-text);
 }
 
 .tv-countdown span {
-  font-size: 0.85rem;
-  opacity: 0.85;
+  font-size: var(--text-sm);
+  color: var(--muted);
 }
 
+/* Underline tabs: the active one carries the accent, the rest stay quiet. */
 .tv-tabs {
   display: flex;
-  gap: 0.25rem;
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 0.25rem;
-  box-shadow: var(--shadow);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .tv-tab {
-  flex: 1;
+  flex: 1 0 auto;
+  min-height: var(--touch);
   font: inherit;
   font-weight: 600;
   border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   background: transparent;
-  padding: 0.55rem;
-  border-radius: 8px;
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
-  color: var(--grey);
+  color: var(--muted);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.tv-tab:hover {
+  color: var(--ink);
 }
 
 .tv-tab-active {
-  background: var(--red);
-  color: #fff;
+  color: var(--ink);
+  border-bottom-color: var(--accent);
 }
 
 .tv-check-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .tv-check-head h2 {
@@ -87,9 +91,9 @@
 .tv-tn {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0;
-  border-top: 1px solid var(--grey-light);
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
 }
 
 .tv-tn-main {
@@ -101,11 +105,26 @@
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-2);
 }
 
 .tv-tn .muted {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .tv-countdown {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .tv-tn {
+    flex-wrap: wrap;
+  }
+
+  .tv-tn .rolle-select {
+    margin-left: calc(1.25em + var(--space-3));
+  }
 }

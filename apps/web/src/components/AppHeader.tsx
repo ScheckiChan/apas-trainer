@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { Icon } from './Icon';
 import './AppHeader.css';
 
 export function AppHeader({ backTo, children }: { backTo?: string; children?: ReactNode }) {
@@ -7,8 +8,8 @@ export function AppHeader({ backTo, children }: { backTo?: string; children?: Re
     <header className="app-header">
       <div className="app-header-inner">
         {backTo && (
-          <Link to={backTo} className="app-header-back" aria-label="Zurück">
-            ←
+          <Link to={backTo} className="btn btn-ghost btn-icon app-header-back" aria-label="Zurück">
+            <Icon name="arrow-left" />
           </Link>
         )}
         <Link to="/" className="app-header-brand">

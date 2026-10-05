@@ -8,6 +8,7 @@ import {
   type Teilnehmer,
 } from '@apas/shared';
 import { api, type AuthKind } from '../lib/api';
+import { Icon } from './Icon';
 import './Rollen.css';
 
 /** PATCH /teilnehmer/:id/rolle — usable by the Ausbildungsleiter and every Teilnehmer of the Trupp. */
@@ -53,9 +54,9 @@ export function RollenAbdeckung({ teilnehmer }: { teilnehmer: Teilnehmer[] }) {
   const besetzt = ROLLEN.filter((r) => counts[r] > 0).length;
   return (
     <div className="rollen-abdeckung">
-      <strong className={besetzt === ROLLEN.length ? 'rollen-voll' : ''}>
+      <span className={`rollen-count ${besetzt === ROLLEN.length ? 'rollen-voll' : ''}`}>
         {besetzt}/{ROLLEN.length} Rollen besetzt
-      </strong>
+      </span>
       <span className="rollen-chips">
         {ROLLEN.map((r) => (
           <span
@@ -63,8 +64,9 @@ export function RollenAbdeckung({ teilnehmer }: { teilnehmer: Teilnehmer[] }) {
             className={`rollen-chip ${counts[r] > 0 ? 'rollen-chip-ok' : ''}`}
             title={`${ROLLE_LABELS[r]}: ${counts[r] === 0 ? 'unbesetzt' : `${counts[r]}× besetzt`}`}
           >
+            {counts[r] > 0 && <Icon name="check" size="1em" />}
             {ROLLE_SHORT[r]}
-            {counts[r] > 1 && <small> ×{counts[r]}</small>}
+            {counts[r] > 1 && <span> ×{counts[r]}</span>}
           </span>
         ))}
       </span>
