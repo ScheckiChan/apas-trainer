@@ -1,5 +1,6 @@
 import {
   isTruppIcon,
+  normalisiereWochentage,
   type Benutzer,
   type BenutzerUebersicht,
   type Einstellungen,
@@ -9,6 +10,7 @@ import {
   type Termin,
   type Trupp,
   type TruppIcon,
+  type Wochentag,
 } from '@apas/shared';
 import type {
   BenutzerRecord,
@@ -42,6 +44,14 @@ export function toTrupp(trupp: TruppRecord, opts: { includeInvite: boolean }): T
   };
 }
 
+/**
+ * Stored preferred days, defensively normalised (valid weekdays, deduped, Monday-first) so a
+ * pre-migration record (field missing) or a hand-edited value never reaches the frontend.
+ */
+export function trainingspraeferenzOf(b: Pick<BenutzerRecord, 'trainingspraeferenz'>): Wochentag[] {
+  return Array.isArray(b.trainingspraeferenz) ? normalisiereWochentage(b.trainingspraeferenz) : [];
+}
+
 /** Own account only (incl. e-mail) — never for lists other Teilnehmer see. */
 export function toBenutzer(b: BenutzerRecord): Benutzer {
   return {
@@ -54,6 +64,7 @@ export function toBenutzer(b: BenutzerRecord): Benutzer {
     rolle: b.truppId ? (b.rolle ?? null) : null,
     gewuenschteRolle: b.truppId ? null : (b.gewuenschteRolle ?? null),
     checkliste: b.checkliste,
+    trainingspraeferenz: trainingspraeferenzOf(b),
     createdAt: b.createdAt,
   };
 }

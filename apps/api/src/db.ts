@@ -8,6 +8,7 @@ import type {
   TerminTyp,
   TruppIcon,
   WappenContentType,
+  Wochentag,
 } from '@apas/shared';
 import { config } from './config.js';
 import { JsonCollection } from './lib/store.js';
@@ -37,6 +38,11 @@ export interface BenutzerRecord {
    */
   gewuenschteRolle: Rolle | null;
   checkliste: Checkliste;
+  /**
+   * Self-reported preferred training days (canonical Monday-first, deduped; [] = none set).
+   * Missing on records older than migrateTrainingspraeferenz — read via trainingspraeferenzOf().
+   */
+  trainingspraeferenz?: Wochentag[];
   createdAt: string;
   /** When attached to the current Trupp; null without a Trupp. */
   joinedAt: string | null;

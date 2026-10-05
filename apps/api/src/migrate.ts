@@ -375,6 +375,37 @@ export function migrateGewuenschteRolle(dataDir: string): void {
   console.log(`[migrate] benutzer.json: gewuenschteRolle: null ergänzt/bereinigt (${changed})`);
 }
 
+/**
+ * Trainingspräferenz: every account gets `trainingspraeferenz: []` ("no preference set" — not
+ * "every day") if the field is missing or not an array. Additive only; existing values and
+ * every other field stay untouched. Idempotent. (Reads normalise via trainingspraeferenzOf()
+ * in serialize.ts anyway.)
+ */
+export function migrateTrainingspraeferenz(dataDir: string): void {
+  const file = path.join(dataDir, 'benutzer.json');
+  if (!existsSync(file)) return;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    console.error(`[migrate] benutzer.json nicht lesbar — Trainingspräferenz-Migration übersprungen: ${(err as Error).message}`);
+    return;
+  }
+  if (!Array.isArray(raw)) return;
+  let changed = 0;
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const b = item as Record<string, unknown>;
+    if (!Array.isArray(b.trainingspraeferenz)) {
+      b.trainingspraeferenz = [];
+      changed++;
+    }
+  }
+  if (changed === 0) return;
+  writeArray(file, raw);
+  console.log(`[migrate] benutzer.json: trainingspraeferenz: [] ergänzt (${changed})`);
+}
+
 /** Every migration, in order. Run before the first collection is read (API start, seed script). */
 export function runMigrations(dataDir: string): void {
   if (!existsSync(dataDir)) return;
@@ -385,4 +416,5 @@ export function runMigrations(dataDir: string): void {
   migrateTruppIcon(dataDir);
   migrateAnwesend(dataDir);
   migrateGewuenschteRolle(dataDir);
+  migrateTrainingspraeferenz(dataDir);
 }

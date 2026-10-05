@@ -97,6 +97,7 @@ export function newBenutzerRecord(input: {
     rolle: null,
     gewuenschteRolle: null,
     checkliste: { ...EMPTY_CHECKLISTE },
+    trainingspraeferenz: [],
     createdAt: now,
     joinedAt: truppId ? now : null,
   };

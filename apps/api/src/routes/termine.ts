@@ -6,7 +6,7 @@ import { isAusbilder, requireAuth } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId } from '../lib/ids.js';
 import { forgetReminders, notifyNewFixtermin } from '../reminders.js';
-import { toTermin, truppIconOf } from '../serialize.js';
+import { toTermin, trainingspraeferenzOf, truppIconOf } from '../serialize.js';
 
 /**
  * Mounted at /api/termine. One shared calendar for the whole instance (= one Ausbildung):
@@ -104,6 +104,7 @@ termineRouter.get('/personen', async (_req, res) => {
         truppId: b.truppId,
         truppName: b.truppId ? (trupp?.name ?? '—') : null,
         truppIcon: truppIconOf(trupp),
+        trainingspraeferenz: trainingspraeferenzOf(b),
       };
     })
     .sort(

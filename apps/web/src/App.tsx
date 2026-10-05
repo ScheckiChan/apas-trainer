@@ -7,6 +7,7 @@ import { homePath, useSession } from './lib/session';
 import { BenutzerVerwaltung } from './views/Benutzer';
 import { KalenderPage } from './views/Calendar';
 import { Join } from './views/Join';
+import { Konto } from './views/Konto';
 import { Login } from './views/Login';
 import { Rangliste } from './views/Rangliste';
 import { Registrieren } from './views/Registrieren';
@@ -181,6 +182,7 @@ export function App() {
       <Route path="/stationen/:stationId" element={<StationDetailPage />} />
       <Route path="/rangliste" element={<Gate><Rangliste /></Gate>} />
       <Route path="/kalender" element={<Gate><KalenderPage /></Gate>} />
+      <Route path="/konto" element={<Gate><Konto /></Gate>} />
       <Route path="/benutzer" element={<Gate rollen={['ausbilder']}><BenutzerVerwaltung /></Gate>} />
 
       <Route path="/trupps" element={<Gate rollen={['ausbilder', 'pruefer']}><TruppDashboard /></Gate>} />

@@ -22,6 +22,9 @@ towards the same Prüfungstermin with live feedback.
 - **Shared calendar & resource booking** — one calendar for the whole exam cohort, fixed
   training dates and individual practice sessions, shared equipment/vehicle booking with
   conflict warnings, RSVP ("Ich bin dabei") on fixed dates.
+- **Trainingspräferenz** — every account can mark its preferred training weekdays under
+  "Mein Konto"; the calendar picker quietly hints when a date falls outside them.
+  Informational only, it never restricts scheduling.
 - **Push notifications** — reminders before a training date, and an immediate push when a
   new one is scheduled.
 - **Installable PWA** — works offline for the station content, installable on any phone,
