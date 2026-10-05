@@ -13,12 +13,12 @@ export function weiterNach(state: unknown): string | null {
   return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && from !== '/login' ? from : null;
 }
 
-/** One login for every account (Ausbilder, Prüfer, Teilnehmer): Name + Passwort. */
+/** One login for every account (Ausbilder, Prüfer, Teilnehmer): E-Mail-Adresse + Passwort. */
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn } = useSession();
-  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function Login() {
     setBusy(true);
     setError(null);
     try {
-      const body: LoginRequest = { name, password };
+      const body: LoginRequest = { email: email.trim(), password };
       const session = await api<AuthSession>('/auth/login', { method: 'POST', auth: 'none', body });
       signIn(session);
       navigate(weiterNach(location.state) ?? homePath(session), { replace: true });
@@ -55,16 +55,19 @@ export function Login() {
           )}
           <div>
             <div className="field">
-              <label htmlFor="login-name">Name</label>
+              <label htmlFor="login-email">E-Mail-Adresse</label>
               <input
-                id="login-name"
+                id="login-email"
+                type="email"
+                inputMode="email"
                 autoComplete="username"
-                autoCapitalize="words"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
-                minLength={2}
-                maxLength={100}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                maxLength={254}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="field">
@@ -88,6 +91,10 @@ export function Login() {
         <div className="stack">
           <p className="auth-alt">
             Noch kein Konto? <Link to="/registrieren">Registrieren</Link>
+          </p>
+          <p className="muted">
+            Bisher mit deinem Namen angemeldet? Die Anmeldung läuft jetzt über die E-Mail-Adresse. Ist bei deinem Konto
+            noch keine hinterlegt, trägt sie ein Ausbilder in der Benutzerverwaltung für dich ein.
           </p>
           <p className="muted">
             Hast du einen Einladungslink oder QR-Code von deinem Trupp? Öffne ihn — dort kannst du direkt beitreten.

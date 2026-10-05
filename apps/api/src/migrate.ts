@@ -163,6 +163,8 @@ export function migrateBenutzer(dataDir: string): void {
         id: t.id,
         name: uniqueName(cleanName(t.name, `Teilnehmer ${String(t.id).slice(0, 8)}`), truppId ? (truppName.get(truppId) ?? 'Trupp') : null),
         ...(typeof t.passwordHash === 'string' ? { passwordHash: t.passwordHash } : {}),
+        // Magic-link era address, if any — migrateEmail validates and keeps it.
+        ...(typeof t.email === 'string' ? { email: t.email } : {}),
         systemRolle: 'teilnehmer',
         ff: typeof t.ff === 'string' && t.ff.trim() ? t.ff : null,
         truppId,
@@ -241,12 +243,107 @@ export function migrateAnwesend(dataDir: string): void {
   console.log(`[migrate] termine.json: anwesendIds ergänzt (${changed})`);
 }
 
+// ---------------------------------------------------------------------------
+// Login via e-mail address (name → email as login identifier)
+// ---------------------------------------------------------------------------
+
+/** Kept in sync with PLACEHOLDER_EMAIL_DOMAIN in @apas/shared (not imported: migrations stay self-contained). */
+const PLATZHALTER_DOMAIN = 'ohne-email.lokal';
+/** Deliberately simple plausibility check — the strict zod check guards all new input. */
+const looksLikeEmail = (v: string): boolean => v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+const asEmail = (v: unknown): string | null => {
+  if (typeof v !== 'string') return null;
+  const e = v.trim().toLowerCase();
+  return looksLikeEmail(e) ? e : null;
+};
+
+/**
+ * Every account gets an `email` (the new login identifier), unique instance-wide, stored
+ * lowercase. Per record:
+ *
+ * 1. An existing plausible `email` (e.g. left over from the magic-link era) is kept, only
+ *    normalised (trimmed, lowercase).
+ * 2. Otherwise an Ausbilder whose `name` is an e-mail address — migrateBenutzer set the former
+ *    Ausbildungsleiter's name to their e-mail — gets that address. `name` stays unchanged.
+ * 3. Otherwise a placeholder `<id>@ohne-email.lokal`: obviously not deliverable, flagged in
+ *    the Benutzerverwaltung so an Ausbilder can enter the real address.
+ *
+ * Ausbilder are processed first (they sign in with that address today); an address already
+ * used by an earlier record gets a placeholder instead (logged). Purely
+ * additive apart from the lowercase normalisation; idempotent (nothing is written once every
+ * record has a unique normalised address). Never throws on odd records.
+ */
+export function migrateEmail(dataDir: string): void {
+  const file = path.join(dataDir, 'benutzer.json');
+  if (!existsSync(file)) return;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    console.error(`[migrate] benutzer.json nicht lesbar — E-Mail-Migration übersprungen: ${(err as Error).message}`);
+    return;
+  }
+  if (!Array.isArray(raw)) return;
+
+  const taken = new Set<string>();
+  let normalisiert = 0;
+  let ausName = 0;
+  let platzhalter = 0;
+  let changed = false;
+
+  const records = raw.map((item: unknown, i: number) => ({ item, i }));
+  const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const rank = (v: unknown) => (isObj(v) && v.systemRolle === 'ausbilder' ? 0 : 1);
+  // Ausbilder first: they sign in with that address today, so they win a collision.
+  records.sort((a, b) => rank(a.item) - rank(b.item) || a.i - b.i);
+
+  for (const { item, i } of records) {
+    if (!isObj(item)) continue;
+    const b = item;
+    const id = typeof b.id === 'string' && b.id ? b.id : `konto-${i}`;
+    const label = `„${typeof b.name === 'string' ? b.name : id}"`;
+
+    const vorhanden = asEmail(b.email);
+    const ausAusbilderName = !vorhanden && b.systemRolle === 'ausbilder' ? asEmail(b.name) : null;
+    const wanted = vorhanden ?? ausAusbilderName;
+
+    let email: string;
+    if (wanted && !taken.has(wanted)) {
+      email = wanted;
+      if (vorhanden) {
+        if (b.email !== vorhanden) normalisiert++;
+      } else {
+        ausName++;
+      }
+    } else {
+      email = `${id}@${PLATZHALTER_DOMAIN}`;
+      if (wanted) console.log(`[migrate] E-Mail „${wanted}" doppelt → Konto ${label} bekommt Platzhalter ${email}`);
+      if (taken.has(email)) email = `${id}-${i}@${PLATZHALTER_DOMAIN}`; // duplicate ids — shouldn't exist
+      platzhalter++;
+    }
+    taken.add(email);
+    if (b.email !== email) {
+      b.email = email;
+      changed = true;
+    }
+  }
+
+  if (!changed) return;
+  writeArray(file, raw);
+  console.log(
+    `[migrate] benutzer.json: email ergänzt — ${ausName} aus bestehender Adresse, ` +
+      `${platzhalter} Platzhalter (…@${PLATZHALTER_DOMAIN})` +
+      (normalisiert ? `, ${normalisiert} vorhandene Adresse(n) kleingeschrieben` : ''),
+  );
+}
+
 /** Every migration, in order. Run before the first collection is read (API start, seed script). */
 export function runMigrations(dataDir: string): void {
   if (!existsSync(dataDir)) return;
   migrateGruppeToTrupp(dataDir);
   migrateSharedCalendar(dataDir);
   migrateBenutzer(dataDir);
+  migrateEmail(dataDir);
   migrateTruppIcon(dataDir);
   migrateAnwesend(dataDir);
 }

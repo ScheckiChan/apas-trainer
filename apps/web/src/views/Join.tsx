@@ -11,7 +11,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AuthBrand } from '../components/AuthBrand';
 import { Icon } from '../components/Icon';
 import { TruppName } from '../components/TruppName';
-import { HttpError, api, errorMessage, lastInvite, rememberInvite } from '../lib/api';
+import { HttpError, api, errorMessage, fieldError, formError, lastInvite, rememberInvite } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { homePath, useSession } from '../lib/session';
 import './Login.css';
@@ -174,13 +174,15 @@ function JoinForm({ info, token }: { info: JoinInfo; token: string }) {
   const [mode, setMode] = useState<Mode>(() =>
     params.has('anmelden') || lastInvite()?.token === token ? 'anmelden' : 'neu',
   );
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [ff, setFf] = useState('');
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 409 on "Neu beitreten" = name taken → offer "Anmelden"; on "Anmelden" = account without
+  // 409 on "Neu beitreten" = e-mail taken → offer "Anmelden"; on "Anmelden" = account without
   // password from before the unified accounts → offer "Neu beitreten".
   const [switchTo, setSwitchTo] = useState<Mode | null>(null);
 
@@ -189,6 +191,7 @@ function JoinForm({ info, token }: { info: JoinInfo; token: string }) {
   const switchMode = (m: Mode) => {
     setMode(m);
     setError(null);
+    setEmailError(null);
     setSwitchTo(null);
     setPassword('');
     setRepeat('');
@@ -197,6 +200,7 @@ function JoinForm({ info, token }: { info: JoinInfo; token: string }) {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setEmailError(null);
     setSwitchTo(null);
     if (mode === 'neu' && password !== repeat) {
       // The inline hint under the field already says what is wrong.
@@ -206,7 +210,7 @@ function JoinForm({ info, token }: { info: JoinInfo; token: string }) {
     setBusy(true);
     try {
       if (mode === 'neu') {
-        const body: JoinRequest = { name, ff, password };
+        const body: JoinRequest = { email: email.trim(), name, ff, password };
         const session = await api<AuthSession>(`/trupps/${encodeURIComponent(token)}/join`, {
           method: 'POST',
           auth: 'none',
@@ -216,7 +220,7 @@ function JoinForm({ info, token }: { info: JoinInfo; token: string }) {
         rememberInvite({ token, truppName: session.trupp?.name ?? info.truppName });
         navigate(homePath(session), { replace: true });
       } else {
-        const body: LoginRequest = { name, password };
+        const body: LoginRequest = { email: email.trim(), password };
         const session = await api<AuthSession>('/auth/login', { method: 'POST', auth: 'none', body });
         signIn(session);
         // Already a member here → straight home; otherwise the page offers "beitreten".
@@ -226,7 +230,10 @@ function JoinForm({ info, token }: { info: JoinInfo; token: string }) {
         }
       }
     } catch (err) {
-      setError(errorMessage(err));
+      const inline = fieldError(err, 'email');
+      setEmailError(inline);
+      setError(formError(err, ['email']));
+      if (inline) document.getElementById('join-email')?.focus();
       if (err instanceof HttpError && err.status === 409) setSwitchTo(mode === 'neu' ? 'anmelden' : 'neu');
       setBusy(false);
     }
@@ -256,7 +263,7 @@ function JoinForm({ info, token }: { info: JoinInfo; token: string }) {
       <p className="muted">
         {mode === 'neu'
           ? 'Lege dein Konto für diesen Trupp an. Deine Rolle wird später gemeinsam im Trupp eingeteilt.'
-          : 'Schon ein Konto? Melde dich mit deinem Namen und Passwort an.'}
+          : 'Schon ein Konto? Melde dich mit deiner E-Mail-Adresse und deinem Passwort an.'}
       </p>
       {error && (
         <div className="alert alert-error" role="alert">
@@ -279,19 +286,52 @@ function JoinForm({ info, token }: { info: JoinInfo; token: string }) {
       )}
       <div>
         <div className="field">
-          <label htmlFor="join-name">Name</label>
+          <label htmlFor="join-email">E-Mail-Adresse</label>
           <input
-            id="join-name"
+            id="join-email"
+            type="email"
+            inputMode="email"
             required
-            minLength={2}
-            maxLength={100}
-            autoComplete="username"
-            autoCapitalize="words"
-            placeholder={mode === 'neu' ? 'z. B. Max Mustermann' : undefined}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            maxLength={254}
+            autoComplete={mode === 'neu' ? 'email' : 'username'}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder={mode === 'neu' ? 'z. B. max@example.com' : undefined}
+            aria-invalid={emailError ? true : undefined}
+            aria-describedby={mode === 'neu' || emailError ? 'join-email-hint' : undefined}
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setEmailError(null);
+            }}
           />
+          {(mode === 'neu' || emailError) && (
+            <p id="join-email-hint" className={`field-hint ${emailError ? 'field-hint-error' : ''}`}>
+              {emailError ?? 'Damit meldest du dich an.'}
+            </p>
+          )}
         </div>
+        {mode === 'neu' && (
+          <div className="field">
+            <label htmlFor="join-name">Name</label>
+            <input
+              id="join-name"
+              required
+              minLength={2}
+              maxLength={100}
+              autoComplete="name"
+              autoCapitalize="words"
+              placeholder="z. B. Max Mustermann"
+              aria-describedby="join-name-hint"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <p id="join-name-hint" className="field-hint">
+              So sehen dich die anderen in der App.
+            </p>
+          </div>
+        )}
         {mode === 'neu' && (
           <div className="field">
             <label htmlFor="join-ff">Feuerwehr</label>

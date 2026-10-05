@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthBrand } from '../components/AuthBrand';
 import { Icon } from '../components/Icon';
-import { HttpError, api, errorMessage } from '../lib/api';
+import { HttpError, api, fieldError, formError } from '../lib/api';
 import { homePath, useSession } from '../lib/session';
 import './Login.css';
 
@@ -14,20 +14,23 @@ import './Login.css';
 export function Registrieren() {
   const navigate = useNavigate();
   const { signIn } = useSession();
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [ff, setFf] = useState('');
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nameTaken, setNameTaken] = useState(false);
+  const [emailTaken, setEmailTaken] = useState(false);
 
   const mismatch = repeat.length > 0 && repeat !== password;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    setNameTaken(false);
+    setEmailError(null);
+    setEmailTaken(false);
     if (password !== repeat) {
       // The inline hint under the field already says what is wrong.
       document.getElementById('reg-repeat')?.focus();
@@ -35,13 +38,16 @@ export function Registrieren() {
     }
     setBusy(true);
     try {
-      const body: RegistrierenRequest = { name, password, ff: ff.trim() || null };
+      const body: RegistrierenRequest = { email: email.trim(), name, password, ff: ff.trim() || null };
       const session = await api<AuthSession>('/auth/registrieren', { method: 'POST', auth: 'none', body });
       signIn(session);
       navigate(homePath(session), { replace: true });
     } catch (err) {
-      setError(errorMessage(err));
-      setNameTaken(err instanceof HttpError && err.status === 409);
+      const inline = fieldError(err, 'email');
+      setEmailError(inline);
+      setError(formError(err, ['email']));
+      setEmailTaken(err instanceof HttpError && err.status === 409);
+      if (inline) document.getElementById('reg-email')?.focus();
       setBusy(false);
     }
   };
@@ -64,7 +70,7 @@ export function Registrieren() {
               <Icon name="triangle-alert" />
               <div className="alert-body">
                 {error}
-                {nameTaken && (
+                {emailTaken && (
                   <div>
                     <Link to="/login" className="btn btn-secondary btn-small auth-switch">
                       Zur Anmeldung
@@ -76,19 +82,47 @@ export function Registrieren() {
           )}
           <div>
             <div className="field">
+              <label htmlFor="reg-email">E-Mail-Adresse</label>
+              <input
+                id="reg-email"
+                type="email"
+                inputMode="email"
+                required
+                maxLength={254}
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="z. B. max@example.com"
+                aria-invalid={emailError ? true : undefined}
+                aria-describedby="reg-email-hint"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailError(null);
+                }}
+              />
+              <p id="reg-email-hint" className={`field-hint ${emailError ? 'field-hint-error' : ''}`}>
+                {emailError ?? 'Damit meldest du dich an.'}
+              </p>
+            </div>
+            <div className="field">
               <label htmlFor="reg-name">Name</label>
               <input
                 id="reg-name"
                 required
                 minLength={2}
                 maxLength={100}
-                autoComplete="username"
+                autoComplete="name"
                 autoCapitalize="words"
                 placeholder="z. B. Max Mustermann"
+                aria-describedby="reg-name-hint"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
-              <p className="field-hint">Damit meldest du dich auch an.</p>
+              <p id="reg-name-hint" className="field-hint">
+                So sehen dich die anderen in der App.
+              </p>
             </div>
             <div className="field">
               <label htmlFor="reg-ff">Feuerwehr (optional)</label>

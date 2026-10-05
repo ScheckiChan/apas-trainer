@@ -5,8 +5,8 @@ Standalone PWA for organising one cross-fire-brigade (FF-übergreifend) training
 deployed once per Ausbildung; the training consists of one or more **Trupps** (4-person
 Atemschutztrupps with the roles GKDT, ATF/ATM1, ATM2 and Wassertruppführer).
 
-- Everyone has **one account** (Name + Passwort, no e-mail) and signs in on the same
-  login. Accounts come from self-registration (`/registrieren`), a Trupp's invite link, or
+- Everyone has **one account** (E-Mail-Adresse + Passwort to sign in, plus a display
+  name) and signs in on the same login. Accounts come from self-registration (`/registrieren`), a Trupp's invite link, or
   an Ausbilder's "Person hinzufügen". Each account has a **systemRolle**:
   - **Ausbilder** create the Trupps, add people (new or already registered) or share a
     Trupp's invite link / QR code, assign the APAS-Rollen, track every checklist (Ampel),
@@ -66,7 +66,7 @@ npm run dev          # API on :3001, web on http://localhost:5173 (proxies /api)
 
 - To try the Teilnehmer side, register at `/registrieren` in a private window (or open a
   Trupp's invite link from TruppDetail and use "Neu beitreten"). Coming back later is the
-  normal login with name + password.
+  normal login with e-mail address + password.
 - The service worker is only registered in production builds, so it never
   interferes with Vite's dev server. Use `npm run build && npm run preview -w @apas/web`
   (with the API running) to test the installable PWA locally.
@@ -88,16 +88,16 @@ Anyone can self-register, but only as Teilnehmer. The first Ausbilder is created
 
 ```bash
 npm run seed-admin
-# Anmeldename des Ausbilders: Max Muster
+# E-Mail-Adresse (Login) des Ausbilders: max@ff-beispiel.at
 # Passwort (min. 10 Zeichen): ********
 ```
 
 Further Ausbilder are best promoted in the Benutzerverwaltung. Running the script again
-with an existing name (case-insensitive) resets that account's password **and makes it
-Ausbilder**, which is also the way back in if every Ausbilder password is lost.
-Non-interactive: `ADMIN_NAME=… ADMIN_PASSWORD=… npm run seed-admin` (`ADMIN_EMAIL` is
-still accepted as an alias, since migrated Ausbildungsleiter accounts log in with their
-former e-mail address as name). The script runs the data migrations first, so it is safe
+with an existing e-mail address (case-insensitive) resets that account's password **and
+makes it Ausbilder**, which is also the way back in if every Ausbilder password is lost.
+Non-interactive: `ADMIN_EMAIL=… ADMIN_PASSWORD=… npm run seed-admin`. `ADMIN_NAME`
+(optional) is the display name for a newly created account — default: the part of the
+address before the `@`; an existing account keeps its name. The script runs the data migrations first, so it is safe
 on an old data directory.
 
 In Docker:
@@ -191,11 +191,11 @@ systemRolle, read from storage on every request. Types are in `packages/shared`.
 
 | Method & path                                                    | Auth                                   |
 | ---------------------------------------------------------------- | -------------------------------------- |
-| `POST /auth/login` {name, password} → `AuthSession`              | public (rate-limited)                  |
-| `POST /auth/registrieren` {name, password, ff?} → `AuthSession`  | public (rate-limited); new Teilnehmer without Trupp |
+| `POST /auth/login` {email, password} → `AuthSession`             | public (rate-limited)                  |
+| `POST /auth/registrieren` {email, name, password, ff?} → `AuthSession` | public (rate-limited); new Teilnehmer without Trupp; `409` for a taken e-mail |
 | `GET  /auth/me` → `MeResponse`                                   | signed in                              |
 | `GET /trupps/:inviteToken/join` (Trupp name + date)              | public                                 |
-| `POST /trupps/:inviteToken/join` {name, ff, password} → `AuthSession` | public (rate-limited); new account in that Trupp |
+| `POST /trupps/:inviteToken/join` {email, name, ff, password} → `AuthSession` | public (rate-limited); new account in that Trupp; `409` for a taken e-mail |
 | `POST /trupps/:inviteToken/beitreten` → `MeResponse`             | signed in, account without Trupp (rate-limited) |
 | `GET /trupps` → `TruppSummary[]`                                 | Ausbilder (with invite) · Prüfer (without) |
 | `POST /trupps` · `PATCH /trupps/:id` · `POST /trupps/:id/invite/regenerate` | Ausbilder                   |
@@ -203,13 +203,15 @@ systemRolle, read from storage on every request. Types are in `packages/shared`.
 | `PATCH /trupps/:id/identitaet` {name?, icon?} → `Trupp`          | Ausbilder · Teilnehmer of that Trupp (else 403) |
 | `GET /trupps/:id`                                                | Ausbilder · Prüfer · member            |
 | `GET /trupps/:id/teilnehmer` → `Teilnehmer[]`                    | Ausbilder · member                     |
-| `POST /trupps/:id/teilnehmer` {name, ff?} → {teilnehmer, tempPassword} | Ausbilder                        |
+| `POST /trupps/:id/teilnehmer` {email, name, ff?} → {teilnehmer, tempPassword} | Ausbilder; `409` for a taken e-mail |
 | `POST /trupps/:id/teilnehmer/zuordnen` {benutzerId} → `Teilnehmer` | Ausbilder                            |
 | `PATCH /trupps/:id/teilnehmer/:tid/checkliste`                   | Ausbilder or that person               |
 | `DELETE /trupps/:id/teilnehmer/:tid` (removes from Trupp, keeps account) | Ausbilder                      |
 | `PATCH /teilnehmer/:tid/rolle` {rolle \| null} (APAS-Rolle)     | Ausbilder or any member of that Trupp  |
 | `GET /benutzer` · `GET /benutzer/ohne-trupp` → `BenutzerUebersicht[]` | Ausbilder                         |
 | `PATCH /benutzer/:id/systemrolle` {systemRolle}                  | Ausbilder (409 for the last Ausbilder) |
+| `PATCH /benutzer/:id/email` {email} → `BenutzerUebersicht`       | Ausbilder (`409` if another account has it) |
+| `PATCH /benutzer/:id/name` {name} → `BenutzerUebersicht`         | Ausbilder                              |
 | `POST /benutzer/:id/passwort-zuruecksetzen` → {tempPassword}     | Ausbilder                              |
 | `DELETE /benutzer/:id`                                           | Ausbilder (not self, not the last Ausbilder) |
 | `GET /einstellungen` → `Einstellungen`                           | public                                 |
@@ -419,12 +421,12 @@ Things SPEC.md left open and how they were resolved:
     Individualübungen. Other Trupps answer `404`, as before.
   - Everyone signed in: Kalender (read, Individualübungen), Ressourcen (read), Rangliste,
     Stationen.
-- **Registration**: `/registrieren` (`POST /auth/registrieren`, name + password, FF
-  optional) creates a `teilnehmer` without a Trupp and signs in right away. Every new
+- **Registration**: `/registrieren` (`POST /auth/registrieren`, e-mail + name + password,
+  FF optional) creates a `teilnehmer` without a Trupp and signs in right away. Every new
   account starts as `teilnehmer`, also via invite link or Person hinzufügen; only
   `seed-admin` and the Benutzerverwaltung make Ausbilder or Prüfer.
 - **Invite link and registration are unified**: both create the same account type. The
-  invite link (`POST /trupps/:token/join`, name + FF + password) additionally sets the
+  invite link (`POST /trupps/:token/join`, e-mail + name + FF + password) additionally sets the
   Trupp membership. An already registered account without a Trupp can join via the link
   while signed in (`POST /trupps/:token/beitreten`); an account already in another Trupp
   gets a `409` and has to be moved by an Ausbilder (remove + attach).
@@ -438,27 +440,42 @@ Things SPEC.md left open and how they were resolved:
   elsewhere. Deleting an account is a separate Benutzerverwaltung action
   (`DELETE /benutzer/:id`) that also removes it from every Termin and drops its push
   subscriptions. Saved Ergebnisse belong to the Trupp and stay.
-- **Benutzerverwaltung** (`/benutzer`, Ausbilder only): every account with name, FF,
-  systemRolle and Trupp; the systemRolle can be changed per row. **Guardrail:** demoting
+- **Benutzerverwaltung** (`/benutzer`, Ausbilder only): every account with e-mail, name,
+  FF, systemRolle and Trupp; e-mail, name and systemRolle can each be changed per row
+  (independent endpoints). Placeholder addresses (`…@ohne-email.lokal`, see below) are
+  flagged there via `isPlaceholderEmail()` from `@apas/shared`. **Guardrail:** demoting
   (or deleting) the **last** Ausbilder is refused with `409` ("Es muss mindestens ein
   Ausbilder bestehen bleiben …"), whether it's yourself or someone else. The check runs
   inside the collection's write lock, so two concurrent demotions can't both pass. With a
   second Ausbilder it is allowed, including demoting yourself. Nobody can delete their
   own account. "Passwort zurücksetzen" (new one-time password) replaces the old "remove
   and re-add" workaround, now that removing keeps the account. If every Ausbilder
-  password is lost, `npm run seed-admin` with an existing name resets it and makes that
-  account Ausbilder.
+  password is lost, `npm run seed-admin` with an existing e-mail address resets it and
+  makes that account Ausbilder.
 
 **Auth & sessions**
-- **One login for every role**: `POST /auth/login` with name + password, at `/login`.
+- **One login for every role**: `POST /auth/login` with e-mail address + password, at `/login`.
   Two entry points would have been barely simpler to build and would have kept the
   identity split this change removes. The invite token is no longer part of logging in;
   regenerating an invite link only affects joining.
-- **Login identifier = the name, unique instance-wide**, compared trimmed,
-  whitespace-collapsed and case-insensitive ("max  muster" = "Max Muster"). Before, names
-  were only unique per Trupp. A taken name gets a `409` that suggests signing in or adding
-  an initial. Wrong name and wrong password give the same `401`. Unknown names still run a
-  bcrypt compare, so timing doesn't reveal which names exist.
+- **Login identifier = the e-mail address, unique instance-wide**, stored and compared
+  trimmed + lowercase (`emailKey()` in `lib/benutzer.ts`). New addresses are validated
+  (zod `.email()`, max 254); the placeholder domain `ohne-email.lokal` is rejected as
+  input. A taken address gets a `409` ("Für die E-Mail-Adresse „…" gibt es schon ein
+  Konto. …"). The login itself does no format check, so wrong address and wrong password
+  give the same `401` ("E-Mail-Adresse oder Passwort falsch"); unknown addresses still
+  run a bcrypt compare, so timing doesn't reveal which accounts exist.
+- **`name` is only the display name** (Trupp lists, Kalender, Rangliste, Benutzerverwaltung)
+  and no longer unique. E-mail addresses are only returned for the signed-in account
+  itself (`/auth/me` & co.) and in the Ausbilder-only Benutzerverwaltung — never in Trupp
+  member lists, the Kalender picker or the Rangliste.
+- **Placeholder addresses**: accounts without a known address got `<id>@ohne-email.lokal`
+  from the migration (`migrateEmail`, logged as `[migrate] benutzer.json: email ergänzt —
+  X aus bestehender Adresse, Y Platzhalter …`). Those people can't sign in until an
+  Ausbilder enters their real address in the Benutzerverwaltung (their password stays
+  valid; reset it there if needed). Migrated Ausbildungsleiter keep their former e-mail address (their
+  old login name) as `email`; an existing `email` field is kept, lowercased; a duplicate
+  address goes to the Ausbilder (then file order), the other account gets a placeholder.
 - **Token**: a JWT (audience `apas:benutzer`) with the claims
   `{ kind: 'benutzer', sub: <Benutzer id>, systemRolle, iat, exp, aud }`. Only `sub` is
   trusted: every request loads the account from `benutzer.json` and uses its current
@@ -482,8 +499,8 @@ Things SPEC.md left open and how they were resolved:
   Benutzerverwaltung.
 - Legacy records from the magic-link era have no password. Login tells them to use "Neu
   beitreten" once on their Trupp's invite link with exactly the same name. That
-  **claims** the existing record (sets the password, keeps id, Rolle, checklist and
-  Termine).
+  **claims** the existing record (sets the password and the entered e-mail address, keeps
+  id, Rolle, checklist and Termine).
 - Rate limits: 300 req/min per IP on the whole API. Login allows 20 **failed** attempts
   per 15 min per IP (successful logins don't count, so a whole Trupp behind one NAT can
   still sign in). Registration, invite-link join and "beitreten" share a budget of 30
@@ -510,6 +527,7 @@ Things SPEC.md left open and how they were resolved:
   "Name (Truppname)", and if that is taken too, "Name (Truppname) 2", "… 3". Every
   rename is logged (`[migrate] Anmeldename „…" doppelt → „…"`) and visible in the
   Benutzerverwaltung, so the Ausbilder can tell those people their new login name.
+  (Superseded since: the login is now the e-mail address, names may repeat.)
 - Termine created by the old Leiter keep `createdBy: 'ausbildungsleiter'` (every
   Ausbilder may edit them anyway); new Termine store the creator's account id.
 

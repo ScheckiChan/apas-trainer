@@ -20,3 +20,8 @@
   overflow-wrap: anywhere;
   max-width: 100%;
 }
+
+/* Long addresses must wrap instead of widening the card at 390px. */
+.einmal-pw-email {
+  overflow-wrap: anywhere;
+}

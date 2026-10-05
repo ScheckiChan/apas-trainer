@@ -1,5 +1,6 @@
 import {
   checklistAmpel,
+  isPlaceholderEmail,
   kannTruppIdentitaetBearbeiten,
   SYSTEM_ROLLE_LABELS,
   type BenutzerUebersicht,
@@ -21,7 +22,7 @@ import { Icon } from '../components/Icon';
 import { RolleSelect, RollenAbdeckung, saveRolle } from '../components/Rollen';
 import { TruppIdentitaet } from '../components/TruppIdentitaet';
 import { TruppName } from '../components/TruppName';
-import { api, deleteTrupp, errorMessage, truppLoeschenFrage } from '../lib/api';
+import { api, deleteTrupp, errorMessage, formError, truppLoeschenFrage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
 import { useMe, useSession } from '../lib/session';
 import './TruppDetail.css';
@@ -259,7 +260,7 @@ type AddMode = 'neu' | 'bestehend';
  */
 function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Teilnehmer) => void }) {
   const [mode, setMode] = useState<AddMode | null>(null);
-  const [created, setCreated] = useState<TeilnehmerCreateResponse | null>(null);
+  const [created, setCreated] = useState<(TeilnehmerCreateResponse & { email: string }) | null>(null);
   const [zugeordnet, setZugeordnet] = useState<string | null>(null);
 
   const open = (m: AddMode) => {
@@ -271,7 +272,7 @@ function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Tei
   return (
     <div className="gd-add">
       {created && (
-        <EinmalPasswort password={created.tempPassword} onClose={() => setCreated(null)}>
+        <EinmalPasswort password={created.tempPassword} email={created.email} onClose={() => setCreated(null)}>
           <strong>{created.teilnehmer.name}</strong> wurde hinzugefügt.
         </EinmalPasswort>
       )}
@@ -287,9 +288,9 @@ function AddTeilnehmer({ truppId, onAdded }: { truppId: string; onAdded: (t: Tei
         <NeuesKonto
           truppId={truppId}
           onCancel={() => setMode(null)}
-          onCreated={(res) => {
+          onCreated={(res, email) => {
             onAdded(res.teilnehmer);
-            setCreated(res);
+            setCreated({ ...res, email });
             setMode(null);
           }}
         />
@@ -325,9 +326,11 @@ function NeuesKonto({
   onCancel,
 }: {
   truppId: string;
-  onCreated: (res: TeilnehmerCreateResponse) => void;
+  /** `email` is the login address that was entered (the response carries no e-mail). */
+  onCreated: (res: TeilnehmerCreateResponse, email: string) => void;
   onCancel: () => void;
 }) {
+  const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [ff, setFf] = useState('');
   const [busy, setBusy] = useState(false);
@@ -338,17 +341,20 @@ function NeuesKonto({
     setBusy(true);
     setError(null);
     try {
-      const body: TeilnehmerCreateRequest = { name, ff: ff.trim() || null };
-      onCreated(await api<TeilnehmerCreateResponse>(`/trupps/${truppId}/teilnehmer`, { method: 'POST', body }));
+      const body: TeilnehmerCreateRequest = { email: email.trim(), name, ff: ff.trim() || null };
+      const res = await api<TeilnehmerCreateResponse>(`/trupps/${truppId}/teilnehmer`, { method: 'POST', body });
+      onCreated(res, body.email.toLowerCase());
     } catch (err) {
-      setError(errorMessage(err));
+      setError(formError(err, []));
       setBusy(false);
     }
   };
 
   return (
-    <form className="gd-add-form" onSubmit={submit} aria-label="Neues Konto anlegen">
-      <p className="muted gd-add-intro">Neues Konto mit einmaligem Passwort anlegen.</p>
+    <form className="gd-add-form gd-add-form-neu" onSubmit={submit} aria-label="Neues Konto anlegen">
+      <p className="muted gd-add-intro">
+        Neues Konto mit einmaligem Passwort anlegen. Die Person meldet sich mit ihrer E-Mail-Adresse an.
+      </p>
       {error && (
         <div className="alert alert-error gd-add-error" role="alert">
           <Icon name="triangle-alert" />
@@ -356,14 +362,29 @@ function NeuesKonto({
         </div>
       )}
       <input
+        type="email"
+        inputMode="email"
+        required
+        maxLength={254}
+        autoComplete="off"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        placeholder="E-Mail-Adresse (für die Anmeldung)"
+        aria-label="E-Mail-Adresse (für die Anmeldung)"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        autoFocus
+      />
+      <input
         required
         minLength={2}
         maxLength={100}
+        autoComplete="off"
         placeholder="Name, z. B. Max Mustermann"
         aria-label="Name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        autoFocus
       />
       <input
         minLength={2}
@@ -421,7 +442,12 @@ function BestehendesKonto({
   };
 
   const label = (b: BenutzerUebersicht) =>
-    [b.name, b.ff, b.systemRolle !== 'teilnehmer' ? SYSTEM_ROLLE_LABELS[b.systemRolle] : null]
+    [
+      b.name,
+      isPlaceholderEmail(b.email) ? null : b.email,
+      b.ff,
+      b.systemRolle !== 'teilnehmer' ? SYSTEM_ROLLE_LABELS[b.systemRolle] : null,
+    ]
       .filter(Boolean)
       .join(' · ');
 
