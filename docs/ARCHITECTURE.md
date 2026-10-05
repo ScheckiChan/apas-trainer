@@ -15,6 +15,7 @@ systemRolle, read from storage on every request. Types are in `packages/shared`.
 | `POST /auth/login` {email, password} → `AuthSession`             | public (rate-limited)                  |
 | `POST /auth/registrieren` {email, name, password, ff} → `AuthSession` | public (rate-limited); new Teilnehmer without Trupp; FF required; `409` for a taken e-mail |
 | `GET  /auth/me` → `MeResponse`                                   | signed in                              |
+| `PUT  /auth/me/trainingspraeferenz` {tage: Wochentag[]} → `MeResponse` | signed in, own account only (any systemRolle) |
 | `GET /trupps/:inviteToken/join` (Trupp name + date)              | public                                 |
 | `POST /trupps/:inviteToken/join` {email, name, ff, password} → `AuthSession` | public (rate-limited); new account in that Trupp; `409` for a taken e-mail |
 | `POST /trupps/:inviteToken/beitreten` → `MeResponse`             | signed in, account without Trupp (rate-limited) |
@@ -509,6 +510,24 @@ Things SPEC.md left open and how they were resolved:
   "Absagen" toggle and the full name list. Deleting an account removes it from
   `anwesendIds`. Existing `termine.json` records get `anwesendIds: []` on API start
   (`migrateAnwesend`, idempotent).
+
+**Trainingspräferenz (preferred training days)**
+- `Benutzer.trainingspraeferenz: Wochentag[]` (`montag`…`sonntag`, `WOCHENTAGE` in
+  `@apas/shared`, Monday-first like the calendar grid). `[]` means "keine Angabe", not
+  "every day" — new accounts start empty and `migrateTrainingspraeferenz` adds `[]` to
+  existing records on API start (idempotent).
+- Self-reported and purely informational: it never filters or blocks assignment, RSVP or
+  anything else; Ausbilder still schedule freely.
+- Set only by the account itself via `PUT /auth/me/trainingspraeferenz` (whole list
+  replaced, deduplicated, stored Monday-first). There is deliberately no admin override
+  and no `:id` variant — nobody needs to manage someone else's preference.
+- UI: "Mein Konto" (`/konto`, from the Konto menu, every role) — seven toggle chips that
+  save on each tap (optimistic, rolled back on error), no Speichern button.
+- Kalender: `GET /termine/personen` includes the field. In the Termin editor's person
+  list (editors only), a muted calendar-x icon + "bevorzugt nicht" appears next to
+  anyone whose non-empty preference doesn't contain the form date's weekday (local
+  time). No hint for an empty preference. Read-only viewers don't see the hints, though
+  the field is readable by any signed-in account via the API (harmless, self-reported).
 
 **Push reminders**
 - Reminders go to the Termin's assigned accounts (any Trupp), the accounts that
