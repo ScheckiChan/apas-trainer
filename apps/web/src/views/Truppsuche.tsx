@@ -310,9 +310,10 @@ export function Truppsuche() {
                   <fieldset key={g.rolle} className="ts-gruppe" disabled={!eigene || bildenBusy}>
                     <legend className="ts-gruppe-titel">
                       <span>{rolleName(g.rolle)}</span>
-                      <span className="badge num" aria-label={personen(g.personen.length)}>
+                      <span className="badge num" aria-hidden="true">
                         {g.personen.length}
                       </span>
+                      <span className="sr-only">{personen(g.personen.length)}</span>
                     </legend>
                     {g.personen.length === 0 ? (
                       <p className="muted ts-gruppe-leer">
