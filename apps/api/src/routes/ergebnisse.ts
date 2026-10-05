@@ -86,7 +86,7 @@ ranglisteRouter.get('/', requireAny, async (req, res) => {
     trupps.map((t) => ({
       truppId: t.id,
       truppName: t.name,
-      eigen: req.leiter ? t.ownerId === req.leiter.sub : req.teilnehmer?.truppId === t.id,
+      eigen: req.teilnehmer?.truppId === t.id,
       ergebnisse: ergebnisse.filter((e) => e.truppId === t.id).map(toErgebnis),
     })),
   );

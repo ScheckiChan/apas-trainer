@@ -7,6 +7,7 @@ import { TruppDetail } from './views/TruppDetail';
 import { TruppDashboard } from './views/TruppDashboard';
 import { Join } from './views/Join';
 import { Login } from './views/Login';
+import { Rangliste } from './views/Rangliste';
 import { StationDetail } from './views/StationDetail';
 import { Stations } from './views/Stations';
 import { TeilnehmerView } from './views/TeilnehmerView';
@@ -17,6 +18,11 @@ function RequireLeiter({ children }: { children: ReactElement }) {
 
 function RequireTeilnehmer({ children }: { children: ReactElement }) {
   return getToken('teilnehmer') ? children : <Navigate to="/login?teilnehmer=1" replace />;
+}
+
+/** Either session will do (Rangliste is visible to everyone signed in). */
+function RequireAny({ children }: { children: ReactElement }) {
+  return getToken('leiter') || getToken('teilnehmer') ? children : <Navigate to="/login" replace />;
 }
 
 function Home() {
@@ -57,7 +63,7 @@ function StationsPage() {
 }
 
 function StationDetailPage({ teilnehmer }: { teilnehmer?: boolean }) {
-  const { stationId } = useParams();
+  const { stationId, truppId } = useParams();
   const base = useStationsBase();
   // Teilnehmer see the overview as a tab; /teilnehmer/stationen redirects back to that tab.
   const basePath = teilnehmer ? '/teilnehmer/stationen' : base.basePath;
@@ -65,7 +71,7 @@ function StationDetailPage({ teilnehmer }: { teilnehmer?: boolean }) {
     <>
       <AppHeader backTo={basePath} />
       <main className="page">
-        <StationDetail stationId={stationId} basePath={basePath} />
+        <StationDetail stationId={stationId} basePath={basePath} truppId={teilnehmer ? undefined : truppId} />
       </main>
     </>
   );
@@ -91,6 +97,7 @@ export function App() {
       <Route path="/join/:token" element={<Join />} />
       <Route path="/stationen" element={<StationsPage />} />
       <Route path="/stationen/:stationId" element={<StationDetailPage />} />
+      <Route path="/rangliste" element={<RequireAny><Rangliste /></RequireAny>} />
 
       <Route path="/trupps" element={<RequireLeiter><TruppDashboard /></RequireLeiter>} />
       <Route path="/trupps/:truppId" element={<RequireLeiter><TruppDetail /></RequireLeiter>} />

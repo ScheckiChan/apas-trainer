@@ -45,9 +45,64 @@
   margin: 0;
 }
 
-.fcl-done .fcl-text {
+.fcl-text {
+  min-width: 0;
+}
+
+/* Rows that happened in this run. */
+.fcl-hit {
+  background: var(--surface-sunk);
+}
+
+.fcl-hit .fcl-text {
+  font-weight: 600;
+}
+
+.fcl-hit .fcl-points {
+  background: var(--accent-subtle);
+  border-color: color-mix(in oklch, var(--accent) 30%, transparent);
+  color: var(--accent-text);
+}
+
+.fcl-counted,
+.fcl-auto {
+  cursor: default;
+}
+
+.fcl-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.fcl-stepper .btn-icon {
+  width: 2.25rem;
+  min-height: 2.25rem;
+}
+
+@media (pointer: coarse) {
+  .fcl-stepper .btn-icon {
+    width: var(--touch);
+    min-height: var(--touch);
+  }
+}
+
+.fcl-count {
+  min-width: 1.25rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.fcl-auto-icon {
+  width: 1.375rem;
   color: var(--muted);
-  text-decoration: line-through;
+}
+
+.fcl-sub {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-weight: 400;
 }
 
 .fcl-points {
@@ -69,6 +124,15 @@
   color: var(--accent-text);
 }
 
+.fcl-sum {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.fcl-sum-over {
+  color: var(--danger);
+}
+
 .fcl-foot {
   display: flex;
   justify-content: space-between;
@@ -85,5 +149,19 @@
   .fcl-points {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .fcl-counted {
+    grid-template-columns: 1fr auto;
+  }
+
+  .fcl-counted .fcl-stepper {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .fcl-counted .fcl-text,
+  .fcl-counted .fcl-points {
+    grid-column: 1;
   }
 }

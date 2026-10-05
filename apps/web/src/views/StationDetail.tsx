@@ -2,19 +2,29 @@ import { Link } from 'react-router-dom';
 import { FehlerCheckliste } from '../components/FehlerCheckliste';
 import { Flashcards } from '../components/Flashcards';
 import { Icon } from '../components/Icon';
+import { ErgebnisSpeichern, LaufLeiste, LaufSumme, Zeitnehmung } from '../components/StationLauf';
 import { StepThrough } from '../components/StepThrough';
-import { FRAGENKATALOG, QUELLE, STATIONEN, stationById, type Zeitvorgabe } from '../content/stations';
+import { FRAGENKATALOG, QUELLE, STATIONEN, stationById, type Station, type Zeitvorgabe } from '../content/stations';
+import { formatMinuten } from '../lib/format';
+import { useLauf } from '../lib/useLauf';
 import './StationDetail.css';
 import './Stations.css';
 
-const minuten = (sek: number) => `${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, '0')} min`;
-
 /**
- * Per-station deep dive: Zeitvorgabe, animated Ablauf step-through, Fehlerpunkte as a
- * self-study checklist, and (Station 4) the Gerätekunde flashcards.
+ * Per-station deep dive: Zeitvorgabe, live Stoppuhr + Fehlerpunkte scoring for a run,
+ * animated Ablauf step-through, and (Station 4) the Gerätekunde flashcards.
  * `basePath` is the station overview this page belongs to (links back/next stay in it).
+ * `truppId` is set on the Ausbildungsleiter's Trupp route and enables "Ergebnis speichern".
  */
-export function StationDetail({ stationId, basePath }: { stationId: string | undefined; basePath: string }) {
+export function StationDetail({
+  stationId,
+  basePath,
+  truppId,
+}: {
+  stationId: string | undefined;
+  basePath: string;
+  truppId?: string;
+}) {
   const station = stationById(stationId);
   if (!station) {
     return (
@@ -31,6 +41,12 @@ export function StationDetail({ stationId, basePath }: { stationId: string | und
     );
   }
 
+  // Keyed so prev/next navigation starts a fresh run.
+  return <StationSeite key={station.id} station={station} basePath={basePath} truppId={truppId} />;
+}
+
+function StationSeite({ station, basePath, truppId }: { station: Station; basePath: string; truppId?: string }) {
+  const lauf = useLauf(station);
   const pos = STATIONEN.indexOf(station);
   const prev = STATIONEN[pos - 1];
   const next = STATIONEN[pos + 1];
@@ -66,6 +82,30 @@ export function StationDetail({ stationId, basePath }: { stationId: string | und
         </div>
       )}
 
+      <Zeitnehmung lauf={lauf} />
+
+      <section className="card stack">
+        <div>
+          <h2>Fehlerpunkte — dieser Durchgang</h2>
+          <p className="muted sd-intro">
+            Abhaken bzw. mitzählen, was beim Durchgang passiert. Die Zeitüberschreitung rechnet die Stoppuhr
+            dazu. {truppId ? 'Gespeichert wird erst mit „Ergebnis speichern".' : 'Zum Üben — wird nicht gespeichert.'}
+          </p>
+        </div>
+        {lauf.teile.map((t, i) => (
+          <FehlerCheckliste
+            key={t.tabelle.titel}
+            tabelle={t.tabelle}
+            counts={t.counts}
+            zeitPunkte={t.zeitPunkte}
+            onChange={(zeile, count) => lauf.setCount(i, zeile, count)}
+            onReset={() => lauf.resetCounts(i)}
+          />
+        ))}
+        <LaufSumme lauf={lauf} />
+        {truppId && <ErgebnisSpeichern station={station} truppId={truppId} lauf={lauf} />}
+      </section>
+
       <section className="card">
         <h2>Ablauf Schritt für Schritt</h2>
         <StepThrough schritte={station.schritte} />
@@ -84,18 +124,6 @@ export function StationDetail({ stationId, basePath }: { stationId: string | und
           {z.text && <p>{z.text}</p>}
         </section>
       ))}
-
-      <section className="card stack">
-        <div>
-          <h2>Checkliste — worauf wird bewertet</h2>
-          <p className="muted sd-intro">
-            Zum Selbststudium: abhaken, was du sicher vermeidest. Wird nicht gespeichert.
-          </p>
-        </div>
-        {station.fehlerpunkte.map((t) => (
-          <FehlerCheckliste key={t.titel} tabelle={t} />
-        ))}
-      </section>
 
       {station.fragenkatalog && (
         <section className="card">
@@ -129,6 +157,8 @@ export function StationDetail({ stationId, basePath }: { stationId: string | und
       </nav>
 
       <p className="stations-source">{QUELLE}</p>
+
+      <LaufLeiste lauf={lauf} />
     </div>
   );
 }
@@ -140,7 +170,7 @@ function ZeitZeile({ z }: { z: Zeitvorgabe }) {
       {z.sekunden !== null ? (
         <dd className="num">
           <strong>{z.sekunden} Sek.</strong>
-          <span>max. {minuten(z.sekunden)}</span>
+          <span>max. {formatMinuten(z.sekunden)}</span>
         </dd>
       ) : (
         <dd className="sd-zeit-text">{z.hinweis}</dd>

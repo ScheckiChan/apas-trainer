@@ -1,0 +1,232 @@
+/* Live station run: Stoppuhr, running total, sticky bar, save. Operated one-handed on a phone. */
+
+.sl-head h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.sl-head p {
+  margin: 0 0 var(--space-3);
+}
+
+.sl-uhren {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sl-uhren-multi {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.sl-uhr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition:
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+
+/* Past the Soll-Zeit: informational amber, never flashing red. */
+.sl-over {
+  background: var(--warn-subtle);
+  border-color: color-mix(in oklch, var(--warn) 55%, transparent);
+}
+
+.sl-uhr .sl-uhr-title {
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+.sl-variante label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.sl-display {
+  font-size: clamp(4rem, 22vw, 7rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-align: center;
+  padding: var(--space-2) 0 0;
+}
+
+.sl-over .sl-display {
+  color: var(--warn-text);
+}
+
+.sl-status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 1.5em;
+  margin: 0;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--muted);
+}
+
+.sl-status strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sl-over .sl-status {
+  color: var(--warn-text);
+}
+
+.sl-over .sl-status strong {
+  color: var(--warn-text);
+}
+
+.sl-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.sl-start {
+  min-height: 3.5rem;
+  font-size: var(--text-lg);
+}
+
+.sl-reset {
+  min-height: 3.5rem;
+}
+
+/* ---------- Gesamt-Fehlerpunkte ---------- */
+
+.sl-summe {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-sunk);
+}
+
+.sl-summe-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+}
+
+.sl-summe-label {
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.sl-summe-value {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.sl-summe-teile,
+.sl-summe-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.sl-summe-teile {
+  list-style: none;
+  padding: 0;
+  font-size: var(--text-sm);
+}
+
+.sl-badge {
+  font-size: var(--text-sm);
+  padding: 0.2rem 0.65rem;
+}
+
+.sl-badge-pass {
+  background: var(--success-subtle);
+  color: var(--success);
+  border-color: color-mix(in oklch, var(--success) 35%, transparent);
+}
+
+.sl-badge-fail {
+  background: var(--danger-subtle);
+  color: var(--danger);
+  border-color: color-mix(in oklch, var(--danger) 30%, transparent);
+}
+
+/* ---------- Sticky bar ---------- */
+
+.sl-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-left: calc(-1 * var(--space-4));
+  margin-right: calc(-1 * var(--space-4));
+  padding: var(--space-2) var(--space-4) calc(var(--space-2) + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: var(--shadow-overlay);
+}
+
+.sl-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sl-bar-time {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.sl-bar-over {
+  color: var(--warn-text);
+}
+
+.sl-bar-teil {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sl-bar-points {
+  margin-left: auto;
+  font-size: var(--text-lg);
+}
+
+.sl-bar-points strong {
+  font-weight: 700;
+}
+
+.sl-bar-pass {
+  color: var(--success);
+}
+
+.sl-bar-fail {
+  color: var(--danger);
+}
+
+/* ---------- Save ---------- */
+
+.sl-save p {
+  margin: 0;
+}
+
+.sl-save-btn {
+  width: 100%;
+  min-height: 3.25rem;
+}

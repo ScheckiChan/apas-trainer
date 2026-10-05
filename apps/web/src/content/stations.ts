@@ -3,8 +3,11 @@
  * Ausbildungsprüfung Atemschutz" (Stand 12/2015), Abschnitte 9.2–9.5 plus Fragenkatalog
  * Gerätekunde and Beilage Hindernisstrecke. Ablauf steps, Zeitvorgaben, Fehlerpunkte and
  * the Fragenkatalog follow the wording of the Bestimmungen — edit with the PDF at hand.
- * The official Bestimmungen are authoritative.
+ * The official Bestimmungen are authoritative. Fehlerpunkte limits come from STATION_WERTUNG
+ * in @apas/shared, which the API uses for the Bestehensregel as well.
  */
+
+import { STATION_WERTUNG, type StationId } from '@apas/shared';
 
 export interface AblaufSchritt {
   titel: string;
@@ -19,6 +22,8 @@ export interface Zeitvorgabe {
   /** null = not a fixed number (e.g. set by the Hauptprüfer). */
   sekunden: number | null;
   hinweis?: string;
+  /** Index of the Fehlerpunkte table (Teil) this time applies to. Default 0. */
+  teil?: number;
 }
 
 export interface Fehlerpunkt {
@@ -43,7 +48,7 @@ export interface ZusatzAbschnitt {
 
 export interface Station {
   /** URL slug for the detail route. */
-  id: string;
+  id: StationId;
   nr: number;
   /** Section in the Bestimmungen. */
   abschnitt: string;
@@ -194,7 +199,7 @@ export const STATIONEN: Station[] = [
     fehlerpunkte: [
       {
         titel: 'Fehlerpunkte Station Ausrüsten',
-        maxPunkte: 20,
+        maxPunkte: STATION_WERTUNG.ausruesten.teile[0].maxPunkte,
         zeilen: [
           { fehler: 'Falsche Adjustierung', bezug: 'je Mitglied', punkte: 1 },
           { fehler: 'Nicht ordnungsgemäß angelegtes Gerät', bezug: 'je Mitglied', punkte: 1 },
@@ -283,7 +288,7 @@ export const STATIONEN: Station[] = [
     fehlerpunkte: [
       {
         titel: 'Fehlerpunkte Station Personensuche',
-        maxPunkte: 10,
+        maxPunkte: STATION_WERTUNG.personensuche.teile[0].maxPunkte,
         zeilen: [
           { fehler: 'Mangelhafte Ausrüstung', bezug: 'je Mitglied', punkte: 1 },
           { fehler: 'Falsche Sprechgruppe', bezug: null, punkte: 1 },
@@ -386,7 +391,7 @@ export const STATIONEN: Station[] = [
     fehlerpunkte: [
       {
         titel: 'Fehlerpunkte Station Hindernisstrecke',
-        maxPunkte: 10,
+        maxPunkte: STATION_WERTUNG.hindernisstrecke.teile[0].maxPunkte,
         zeilen: [
           { fehler: 'Mangelhafte Ausrüstung', bezug: 'je Mitglied', punkte: 1 },
           { fehler: 'Leuchtmittel nicht eingeschaltet', bezug: null, punkte: 1 },
@@ -416,7 +421,7 @@ export const STATIONEN: Station[] = [
     ],
     zeitvorgaben: [
       { label: 'Geräteversorgung', sekunden: 500 },
-      { label: 'Fragen', sekunden: 300 },
+      { label: 'Fragen', sekunden: 300, teil: 1 },
     ],
     schritte: [
       {
@@ -464,7 +469,7 @@ export const STATIONEN: Station[] = [
     fehlerpunkte: [
       {
         titel: 'Fehlerpunkte Station Geräteversorgung',
-        maxPunkte: 5,
+        maxPunkte: STATION_WERTUNG.geraeteversorgung.teile[0].maxPunkte,
         zeilen: [
           { fehler: 'Atemluftflaschen nicht am Boden abgelegt', bezug: 'je Mitglied', punkte: 1 },
           { fehler: 'Fehlerhafte Hochdruckdichtprüfung', bezug: 'je Mitglied', punkte: 1 },
@@ -476,7 +481,7 @@ export const STATIONEN: Station[] = [
       },
       {
         titel: 'Fehlerpunkte Station Fragen',
-        maxPunkte: 6,
+        maxPunkte: STATION_WERTUNG.geraeteversorgung.teile[1].maxPunkte,
         hinweis: 'Zeit max. 300 Sek.',
         zeilen: [
           { fehler: 'Frage nicht beantwortet', bezug: 'je Fall', punkte: 1 },

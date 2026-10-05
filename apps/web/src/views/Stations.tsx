@@ -46,7 +46,7 @@ export function Stations({ basePath }: { basePath: string }) {
                     ))}
                   </ul>
                   <span className="station-more">
-                    Ablauf, Checkliste{s.fragenkatalog ? ' & Lernkarten' : ''}
+                    Stoppuhr, Fehlerpunkte, Ablauf{s.fragenkatalog ? ' & Lernkarten' : ''}
                     <Icon name="arrow-right" size="1.1em" />
                   </span>
                 </div>

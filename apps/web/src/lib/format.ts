@@ -34,6 +34,15 @@ export function countdownLabel(pruefungstermin: string | null | undefined): stri
   return 'vorbei';
 }
 
+/** Stopwatch style "mm:ss" (minutes keep growing past 59). */
+export function formatStoppuhr(sek: number): string {
+  const s = Math.max(0, Math.floor(sek));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** "2:50 min" */
+export const formatMinuten = (sek: number): string => `${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, '0')} min`;
+
 /** YYYY-MM-DD in local time. */
 export function toLocalDateKey(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');

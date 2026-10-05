@@ -123,6 +123,10 @@ export function TruppDetail() {
               <Icon name="book-open-check" />
               Stationen
             </Link>
+            <Link className="btn btn-secondary" to="/rangliste">
+              <Icon name="trophy" />
+              Rangliste
+            </Link>
           </div>
         </div>
 

@@ -34,6 +34,10 @@ export function TruppDashboard() {
   return (
     <>
       <AppHeader>
+        <Link to="/rangliste" className="btn btn-ghost btn-small" title="Rangliste">
+          <Icon name="trophy" />
+          <span className="hide-sm">Rangliste</span>
+        </Link>
         <PushButton auth="leiter" />
         <button type="button" className="btn btn-ghost btn-small" onClick={logout} title="Abmelden">
           <Icon name="log-out" />

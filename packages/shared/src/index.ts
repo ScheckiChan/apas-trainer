@@ -238,7 +238,7 @@ export interface ErgebnisInput {
 export interface RanglistenEintrag {
   truppId: string;
   truppName: string;
-  /** The caller's own Trupp (member, or owned by the calling Ausbildungsleiter). */
+  /** The calling Teilnehmer's own Trupp (always false for an Ausbildungsleiter, who usually owns them all). */
   eigen: boolean;
   /** Recorded stations in STATION_IDS order. */
   ergebnisse: StationErgebnis[];

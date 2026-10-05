@@ -8,7 +8,7 @@ import {
   type Teilnehmer,
 } from '@apas/shared';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
 import { Icon } from '../components/Icon';
@@ -84,6 +84,10 @@ export function TeilnehmerView() {
   return (
     <>
       <AppHeader>
+        <Link to="/rangliste" className="btn btn-ghost btn-small" title="Rangliste">
+          <Icon name="trophy" />
+          <span className="hide-sm">Rangliste</span>
+        </Link>
         <PushButton auth="teilnehmer" />
         <button type="button" className="btn btn-ghost btn-small" onClick={logout} title="Abmelden">
           <Icon name="log-out" />
