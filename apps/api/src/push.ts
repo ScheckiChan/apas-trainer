@@ -74,7 +74,7 @@ export async function sendPushTo(owners: PushOwner[], payload: PushPayload): Pro
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) gone.push(s.endpoint);
-        else console.warn('[push] send failed', status ?? err);
+        else console.warn(`[push] send failed: ${status ?? (err as Error).message}`);
       }
     }),
   );

@@ -26,9 +26,11 @@ export function PushButton({ auth }: { auth: 'leiter' | 'teilnehmer' }) {
       className="btn btn-ghost btn-small"
       onClick={onClick}
       disabled={state === 'busy'}
-      title="Push-Erinnerungen vor Terminen"
+      title={state === 'on' ? 'Push-Erinnerungen sind aktiv' : 'Push-Erinnerungen vor Terminen aktivieren'}
+      aria-label={state === 'on' ? 'Erinnerungen an' : 'Erinnerungen aktivieren'}
     >
-      {state === 'on' ? '🔔 Erinnerungen an' : '🔕 Erinnerungen aktivieren'}
+      {state === 'on' ? '🔔' : '🔕'}
+      <span className="hide-sm">{state === 'on' ? 'Erinnerungen an' : 'Erinnerungen aktivieren'}</span>
     </button>
   );
 }

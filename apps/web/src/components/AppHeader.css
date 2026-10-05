@@ -25,6 +25,7 @@
   text-decoration: none;
   font-weight: 700;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .app-header-brand img {
@@ -51,4 +52,10 @@
 
 .app-header-actions .btn-ghost:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 520px) {
+  .hide-sm {
+    display: none;
+  }
 }

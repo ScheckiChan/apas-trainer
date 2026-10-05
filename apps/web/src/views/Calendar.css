@@ -168,6 +168,10 @@
   white-space: nowrap;
 }
 
+.cal-agenda-item .muted {
+  white-space: nowrap;
+}
+
 /* ---------- Modal ---------- */
 
 .cal-modal-backdrop {
@@ -208,11 +212,14 @@
   min-width: 0;
 }
 
+.cal-fieldset > * + * {
+  margin-top: 0.75rem;
+}
+
 .cal-time-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
   gap: 0.5rem;
-  margin-top: 0.75rem;
 }
 
 .cal-time-row .field + .field {
