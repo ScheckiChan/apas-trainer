@@ -6,7 +6,7 @@
   font-size: var(--text-sm);
 }
 
-/* Station picker: segmented control (raised active segment), 4 across, 2 × 2 on phones. */
+/* Station picker: segmented control (raised active segment), 4 across, 2 × 2 on narrow screens. */
 .rl-tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -62,7 +62,7 @@
   flex-direction: column;
   min-width: 0;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .rl-tab-count {
@@ -179,9 +179,16 @@
   font-weight: 500;
 }
 
-@media (max-width: 560px) {
+/* Four long station names don't fit side by side below ~720px. */
+@media (max-width: 720px) {
   .rl-tabs {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .rl-tab-label {
+    font-size: var(--text-sm);
   }
 
   .rl-row {

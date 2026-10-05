@@ -88,7 +88,7 @@ export function Rangliste() {
                 <span className="rl-tab-label">
                   {STATION_WERTUNG[id].teile[0]?.titel}
                   {anzahl !== undefined && (
-                    <span className="rl-tab-count num">{anzahl === 1 ? '1 Trupp' : `${anzahl} Trupps`}</span>
+                    <span className="rl-tab-count num">{anzahl === 0 ? 'noch leer' : anzahl === 1 ? '1 Trupp' : `${anzahl} Trupps`}</span>
                   )}
                 </span>
               </button>
