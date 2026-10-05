@@ -557,7 +557,7 @@ function TerminEditor({
                         </span>
                         {canEdit && (
                           <button type="button" className="btn btn-ghost btn-small" onClick={() => toggleTrupp(ids)}>
-                            {count === ids.length ? 'Keinen' : 'Ganzen Trupp'}
+                            {count === ids.length ? 'Abwählen' : 'Ganzen Trupp'}
                           </button>
                         )}
                       </div>

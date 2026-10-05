@@ -8,12 +8,13 @@ Atemschutztrupps with the roles GKDT, ATF/ATM1, ATM2 and Wassertruppführer).
 - **Ausbildungsleiter** log in with e-mail + password and land on the Trupp-Liste. They
   create the Trupps, assign the Rollen, add Teilnehmer or share a Trupp's invite link /
   QR code, track every Teilnehmer's checklist (Ampel), set the Prüfungstermin, manage
-  Ressourcen and schedule Fixtermine.
+  the shared Ressourcen and schedule Fixtermine in the shared calendar.
 - **Teilnehmer** open the invite link and either *join* (Name, FF, Passwort) or *sign in*
   again (Name + Passwort) — no e-mail involved. Roles are assigned afterwards, inside the
   Trupp, by anyone in it. Teilnehmer see and toggle their own checklist, see the whole
-  Trupp and its role coverage, browse the Stationskarten and use the shared calendar
-  (incl. creating Individualübungen and booking Ressourcen).
+  Trupp and its role coverage, browse the Stationskarten and use the calendar that all
+  Trupps of the Ausbildung share (incl. creating Individualübungen with people from any
+  Trupp and booking Ressourcen).
 - Push reminders go out N hours before each Termin to its assigned Teilnehmer and the
   Ausbildungsleiter.
 
@@ -23,8 +24,8 @@ Atemschutztrupps with the roles GKDT, ATF/ATM1, ATM2 and Wassertruppführer).
 apps/
   api/            Express 5 + TypeScript API, file-based JSON storage
     src/
-      routes/     auth, join (invite-link join/login), trupps (+teilnehmer, ressourcen),
-                  teilnehmer (Rolle), termine, push
+      routes/     auth, join (invite-link join/login), trupps (+teilnehmer),
+                  teilnehmer (Rolle), termine, ressourcen, ergebnisse, push
       lib/        store (JSON collections + mutex), auth (JWT middleware), password (bcrypt)
       push.ts     web-push wrapper (VAPID, subscriptions)
       reminders.ts  setInterval reminder loop
@@ -183,9 +184,11 @@ All endpoints are under `/api`. Auth is `Authorization: Bearer <jwt>`.
 | `POST /trupps/:id/teilnehmer` {name, ff} → {teilnehmer, tempPassword} | owner                         |
 | `PATCH /trupps/:id/teilnehmer/:tid/checkliste`             | owner or that Teilnehmer      |
 | `DELETE /trupps/:id/teilnehmer/:tid`                       | owner                         |
-| `GET /trupps/:id/ressourcen` · `POST` · `DELETE /:rid`     | member (read) / owner (write) |
-| `GET /trupps/:id/termine?from&to` · `POST` · `PUT/DELETE /:terminId` | member / owner                |
-| `POST /trupps/:id/termine/konflikte`                       | member / owner                |
+| `GET /ressourcen` · `POST` · `DELETE /:rid`                | any signed-in (read) / Leiter (write) |
+| `GET /termine?from&to` · `POST`                            | any signed-in (Fixtermin: Leiter) |
+| `PUT/DELETE /termine/:terminId`                            | Leiter, or creator of an Individualübung |
+| `POST /termine/konflikte` {ressourceId, start, ende, excludeTerminId?} | any signed-in       |
+| `GET /termine/personen` (Teilnehmer of all Trupps + Trupp name) | any signed-in            |
 | `GET /trupps/:id/ergebnisse`                               | member / owner                |
 | `PUT /trupps/:id/ergebnisse/:stationId` {zeitSekunden, fehlerpunkte, teile?} | owner                         |
 | `GET /rangliste`                                           | any signed-in user            |
@@ -215,9 +218,9 @@ Things SPEC.md left open and how they were resolved:
   API (`/api/trupps`, `truppId`) and the UI. SPEC.md itself is kept as the original
   brief and still uses the old term.
 - Several Trupps can train in parallel in the same Ausbildung, so the Trupp entity and
-  "Neuen Trupp erstellen" stay. Each Trupp keeps its own invite link, Prüfungstermin,
-  Ressourcen and calendar, exactly as before. Merging those into one training-wide
-  setting would be a schema change the rename deliberately avoids.
+  "Neuen Trupp erstellen" stay. Each Trupp keeps its own invite link, Prüfungstermin
+  and Stationsergebnisse. The **calendar and the Ressourcen belong to the instance**,
+  not to a Trupp (1 instance : N Trupps) — see **Termine & calendar**.
 - After login the Ausbildungsleiter lands on `/trupps`, a plain list of the Trupps
   (sorted by Prüfungstermin). Each row shows the name, "x/4 Rollen besetzt" (red while
   incomplete), the Teilnehmer and "bereit" counts and the Prüfungstermin countdown, and
@@ -418,25 +421,44 @@ Things SPEC.md left open and how they were resolved:
   shows "x bereit" (green) per Trupp.
 - `Trupp.stufe` exists and is always `'BRONZE'`. It is the cheap hook for
   Silber/Gold later; nothing else is generalised.
-- Ressourcen are scoped per Trupp. Only the Ausbildungsleiter creates or deletes them
-  (in TruppDetail), and every member can book them on Termine. Deleting a Ressource
-  keeps its Termine but removes the booking.
-- Removing a Teilnehmer also removes them from all Termine and deletes their push
-  subscriptions.
+- Ressourcen are instance-wide (no `truppId`): the Trupps of one Ausbildung share the
+  same vehicle, Übungsgelände etc. Only the Ausbildungsleiter creates or deletes them
+  (Ressourcen panel at the bottom of `/kalender`), and anyone signed in can book them
+  on Termine. Deleting a Ressource keeps its Termine but removes the booking.
+- Removing a Teilnehmer also removes them from all Termine (of any creator, since
+  Termine span Trupps) and deletes their push subscriptions.
 - `Buchung` is the shared type for "Ressource booked by a Termin for a time window";
   overlap results come back as `BuchungsKonflikt[]`.
 
 **Termine & calendar**
-- Fixtermine: only the Ausbildungsleiter creates, edits or deletes them.
+- **One shared calendar per instance.** A deployment is one Ausbildung with one exam
+  day, and all its Trupps train towards it with the same Ressourcen, so Termine have no
+  `truppId`. The API lives at `/api/termine` (not under a Trupp) and the web app at
+  `/kalender`, linked from the header next to the Rangliste for the Ausbildungsleiter
+  and every Teilnehmer. Old entry points redirect there (`/trupps/:id/kalender`,
+  `/teilnehmer?tab=kalender`); TruppDetail links to it instead of embedding it.
+- Everyone signed in (the Ausbildungsleiter or any Teilnehmer of any Trupp) sees every
+  Termin. Fixtermine: only the Ausbildungsleiter creates, edits or deletes them.
   Individualübungen: any Teilnehmer (or the Ausbildungsleiter) can create them, and
-  the creator or the Ausbildungsleiter can edit or delete them. Everyone in the Trupp
-  can see every Termin. Others see a read-only detail view.
-- Teilnehmer assignment is completely free (any subset, including none). Defaults:
-  a new Fixtermin pre-selects the whole Trupp; a new Individualübung pre-selects the
-  creator.
+  the creator or the Ausbildungsleiter can edit or delete them — regardless of which
+  Trupps the creator and the assignees belong to. Others see a read-only detail view.
+- Permissions check "is an Ausbildungsleiter" rather than "owns this Trupp": a
+  deployment has a single Ausbildungsleiter account, so there is no per-Trupp ownership
+  to check for calendar data. (Trupp management itself still uses `ownerId`.)
+- Teilnehmer assignment is completely free (any subset of any Trupps, including none).
+  The picker loads `GET /termine/personen` — only id, name, FF, Rolle and Trupp of each
+  Teilnehmer, no Checkliste — groups it by Trupp with a "Ganzen Trupp" toggle per
+  group, and labels every person as "Name (Trupp …)". Defaults: a new Fixtermin
+  pre-selects everyone in every Trupp; a new Individualübung pre-selects the creator.
 - Conflicts: the editor calls `POST /termine/konflikte` live (debounced) and shows a
-  yellow inline banner. Saving is never blocked. The save response also returns the
-  conflicts, as informational data.
+  yellow inline banner. Overlaps are checked against **all** Termine on that Ressource,
+  whichever Trupp booked them — two Trupps booking the one vehicle at the same time is
+  exactly what this is for. Saving is never blocked. The save response also returns
+  the conflicts, as informational data.
+- Existing data is migrated on API start (`migrateSharedCalendar` in `src/migrate.ts`,
+  idempotent, after the Gruppe→Trupp step): `truppId` is stripped from `termine.json`
+  and `ressourcen.json`. Termine and Ressourcen of formerly separate Trupps simply end
+  up in the one calendar.
 - The calendar form edits single-day Termine (date + start/end time). The API
   accepts any start < end range. The month grid starts on Monday (AT convention)
   and shows Fixtermine as solid red chips and Individualübungen as dashed, hatched
@@ -448,6 +470,8 @@ Things SPEC.md left open and how they were resolved:
   Prüfungstermin is a plain `YYYY-MM-DD` date with no timezone.
 
 **Push reminders**
+- Reminders go to the Termin's assigned Teilnehmer (any Trupp) and to every
+  Ausbildungsleiter account (normally exactly one), and link to `/kalender`.
 - One reminder per Termin per start time. Moving a Termin re-arms it. The reminder is
   recorded *before* sending (at-most-once, so a crash never causes duplicates). A
   Termin created less than `REMINDER_HOURS_BEFORE` ahead gets its reminder on the
