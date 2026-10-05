@@ -38,7 +38,7 @@ export function RolleSelect({
       <option value="">— keine Rolle —</option>
       {ROLLEN.map((r) => (
         <option key={r} value={r}>
-          {ROLLE_SHORT[r]} — {ROLLE_LABELS[r]}
+          {ROLLE_SHORT[r]} — {ROLLE_LABELS[r].replace(/\s*\(.*\)$/, '')}
         </option>
       ))}
     </select>

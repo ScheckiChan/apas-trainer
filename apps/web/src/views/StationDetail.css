@@ -113,7 +113,7 @@
     justify-content: space-between;
   }
 
-  .sd-pager-prev {
+  .sd-pager .sd-pager-prev {
     justify-content: flex-start;
   }
 }

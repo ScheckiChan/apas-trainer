@@ -348,8 +348,23 @@
     grid-column: 1 / -1;
   }
 
+  .cal-legend .muted {
+    display: none;
+  }
+
   .cal-agenda-item {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0 var(--space-3);
+  }
+
+  .cal-agenda-item > :not(.cal-typ) {
+    grid-column: 2;
+  }
+
+  .cal-agenda-title,
+  .cal-agenda-item .muted {
+    white-space: normal;
   }
 }
 

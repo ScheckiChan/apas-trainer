@@ -52,7 +52,7 @@
 }
 
 .check-offen .check-icon {
-  color: var(--ampel-rot);
+  color: var(--muted);
 }
 
 .check-offen:not(:disabled):hover {

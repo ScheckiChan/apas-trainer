@@ -53,7 +53,8 @@ export function Join() {
     setError(null);
     setNameTaken(false);
     if (mode === 'neu' && password !== repeat) {
-      setError('Die Passwörter stimmen nicht überein.');
+      // The inline hint under the field already says what is wrong.
+      document.getElementById('join-repeat')?.focus();
       return;
     }
     setBusy(true);
