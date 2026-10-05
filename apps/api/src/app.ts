@@ -4,6 +4,7 @@ import { rateLimit } from 'express-rate-limit';
 import { config } from './config.js';
 import { errorHandler } from './lib/http.js';
 import { authRouter } from './routes/auth.js';
+import { ergebnisseRouter, ranglisteRouter } from './routes/ergebnisse.js';
 import { truppsRouter } from './routes/trupps.js';
 import { joinRouter } from './routes/join.js';
 import { pushRouter } from './routes/push.js';
@@ -47,6 +48,8 @@ export function createApp() {
 
   app.use('/api/auth', authRouter);
   app.use('/api/trupps/:truppId/termine', termineRouter);
+  app.use('/api/trupps/:truppId/ergebnisse', ergebnisseRouter);
+  app.use('/api/rangliste', ranglisteRouter);
   app.use('/api/trupps', joinRouter);
   app.use('/api/trupps', truppsRouter);
   app.use('/api/teilnehmer', teilnehmerRouter);

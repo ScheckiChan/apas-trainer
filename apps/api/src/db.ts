@@ -1,4 +1,4 @@
-import type { Checkliste, Rolle, Stufe, TerminTyp } from '@apas/shared';
+import type { Checkliste, Rolle, StationId, Stufe, TeilErgebnis, TerminTyp } from '@apas/shared';
 import { config } from './config.js';
 import { JsonCollection } from './lib/store.js';
 
@@ -71,6 +71,20 @@ export interface ReminderRecord {
   sentAt: string;
 }
 
+/** Latest result of one Trupp at one station. id = `${truppId}:${stationId}`, so a save overwrites. */
+export interface ErgebnisRecord {
+  id: string;
+  truppId: string;
+  stationId: StationId;
+  zeitSekunden: number;
+  fehlerpunkte: number;
+  teile: TeilErgebnis[];
+  bestanden: boolean;
+  aufgenommenAm: string;
+  /** Ausbildungsleiter id */
+  aufgenommenVon: string;
+}
+
 const dir = config.dataDir;
 
 export const db = {
@@ -81,4 +95,5 @@ export const db = {
   termine: new JsonCollection<TerminRecord>(dir, 'termine'),
   pushSubscriptions: new JsonCollection<PushSubscriptionRecord>(dir, 'pushsubscriptions'),
   reminders: new JsonCollection<ReminderRecord>(dir, 'reminders'),
+  ergebnisse: new JsonCollection<ErgebnisRecord>(dir, 'ergebnisse'),
 };

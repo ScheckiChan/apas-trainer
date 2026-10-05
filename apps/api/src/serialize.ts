@@ -1,5 +1,5 @@
-import type { Trupp, Ressource, Teilnehmer, Termin } from '@apas/shared';
-import type { TruppRecord, RessourceRecord, TeilnehmerRecord, TerminRecord } from './db.js';
+import type { StationErgebnis, Trupp, Ressource, Teilnehmer, Termin } from '@apas/shared';
+import type { ErgebnisRecord, TruppRecord, RessourceRecord, TeilnehmerRecord, TerminRecord } from './db.js';
 
 export function toTrupp(trupp: TruppRecord, opts: { includeInvite: boolean }): Trupp {
   return {
@@ -40,5 +40,16 @@ export function toTermin(t: TerminRecord): Termin {
     teilnehmerIds: t.teilnehmerIds,
     ressourceId: t.ressourceId,
     createdBy: t.createdBy,
+  };
+}
+
+export function toErgebnis(e: ErgebnisRecord): StationErgebnis {
+  return {
+    stationId: e.stationId,
+    zeitSekunden: e.zeitSekunden,
+    fehlerpunkte: e.fehlerpunkte,
+    teile: e.teile,
+    bestanden: e.bestanden,
+    aufgenommenAm: e.aufgenommenAm,
   };
 }

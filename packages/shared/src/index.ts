@@ -164,6 +164,143 @@ export function intervalsOverlap(aStart: string, aEnde: string, bStart: string, 
 }
 
 // ---------------------------------------------------------------------------
+// Stationen: Bestehensregel, recorded results, Rangliste
+// ---------------------------------------------------------------------------
+
+export const STATION_IDS = ['ausruesten', 'personensuche', 'hindernisstrecke', 'geraeteversorgung'] as const;
+export type StationId = (typeof STATION_IDS)[number];
+
+export const isStationId = (v: string): v is StationId => (STATION_IDS as readonly string[]).includes(v);
+
+/**
+ * Fehlerpunkte limits per station from the NÖ LFV Bestimmungen APAS. Station 4 is scored as
+ * two Teile (Geräteversorgung max. 5, Fragen max. 6), each with its own limit and time.
+ * The web content tables read their `maxPunkte` from here.
+ */
+export const STATION_WERTUNG: Record<StationId, { titel: string; teile: { titel: string; maxPunkte: number }[] }> = {
+  ausruesten: { titel: 'Ausrüsten', teile: [{ titel: 'Ausrüsten', maxPunkte: 20 }] },
+  personensuche: { titel: 'Personensuche', teile: [{ titel: 'Personensuche', maxPunkte: 10 }] },
+  hindernisstrecke: { titel: 'Hindernisstrecke', teile: [{ titel: 'Hindernisstrecke', maxPunkte: 10 }] },
+  geraeteversorgung: {
+    titel: 'Geräteversorgung + Fragen',
+    teile: [
+      { titel: 'Geräteversorgung', maxPunkte: 5 },
+      { titel: 'Fragen', maxPunkte: 6 },
+    ],
+  },
+};
+
+/** Bestehensregel: at most 35 Fehlerpunkte over all stations (plus every station within its own limit). */
+export const GESAMT_MAX_FEHLERPUNKTE = 35;
+
+/** "Zeitüberschreitung: 2 Punkte je 10 Sek." — every started 10-second block counts. */
+export const ZEIT_PUNKTE_JE_10_SEK = 2;
+
+export function zeitueberschreitungPunkte(elapsedSek: number, sollSek: number): number {
+  const over = Math.floor(elapsedSek) - sollSek;
+  return over > 0 ? Math.ceil(over / 10) * ZEIT_PUNKTE_JE_10_SEK : 0;
+}
+
+/** A station is passed when every Teil stays within its own limit. */
+export function stationBestanden(stationId: StationId, teilFehlerpunkte: readonly number[]): boolean {
+  return STATION_WERTUNG[stationId].teile.every((t, i) => (teilFehlerpunkte[i] ?? 0) <= t.maxPunkte);
+}
+
+export interface TeilErgebnis {
+  zeitSekunden: number;
+  fehlerpunkte: number;
+}
+
+/** Latest recorded run of one Trupp at one station (only the latest is kept). */
+export interface StationErgebnis {
+  stationId: StationId;
+  /** Sum over the Teile. */
+  zeitSekunden: number;
+  /** Sum over the Teile, including Zeitüberschreitung. */
+  fehlerpunkte: number;
+  /** One entry per Teil of STATION_WERTUNG[stationId]. */
+  teile: TeilErgebnis[];
+  bestanden: boolean;
+  /** ISO datetime */
+  aufgenommenAm: string;
+}
+
+/**
+ * PUT /trupps/:id/ergebnisse/:stationId. `teile` is required for stations with more than one
+ * Teil (Station 4) and must add up to the totals; single-Teil stations may omit it.
+ */
+export interface ErgebnisInput {
+  zeitSekunden: number;
+  fehlerpunkte: number;
+  teile?: TeilErgebnis[];
+}
+
+export interface RanglistenEintrag {
+  truppId: string;
+  truppName: string;
+  /** The caller's own Trupp (member, or owned by the calling Ausbildungsleiter). */
+  eigen: boolean;
+  /** Recorded stations in STATION_IDS order. */
+  ergebnisse: StationErgebnis[];
+  absolviert: number;
+  vollstaendig: boolean;
+  gesamtFehlerpunkte: number;
+  /** Overall Bestehensregel on what is recorded so far — final only when `vollstaendig`. */
+  bestanden: boolean;
+  /** 1-based rank among complete Trupps (ties share a rank); null while incomplete. */
+  rang: number | null;
+}
+
+/** Overall Bestehensregel: total ≤ 35 and no station over its own limit. */
+export function gesamtBestanden(ergebnisse: readonly StationErgebnis[]): boolean {
+  const total = ergebnisse.reduce((s, e) => s + e.fehlerpunkte, 0);
+  return total <= GESAMT_MAX_FEHLERPUNKTE && ergebnisse.every((e) => e.bestanden);
+}
+
+/**
+ * Ranking: complete Trupps first — passed before failed, then fewer Fehlerpunkte first.
+ * Incomplete Trupps follow without a rank (more stations done first), so one great station
+ * never outranks four solid ones.
+ */
+export function rangliste(
+  trupps: readonly { truppId: string; truppName: string; eigen: boolean; ergebnisse: readonly StationErgebnis[] }[],
+): RanglistenEintrag[] {
+  const rows = trupps.map((t): RanglistenEintrag => {
+    const ergebnisse = STATION_IDS.flatMap((id) => t.ergebnisse.filter((e) => e.stationId === id));
+    return {
+      truppId: t.truppId,
+      truppName: t.truppName,
+      eigen: t.eigen,
+      ergebnisse,
+      absolviert: ergebnisse.length,
+      vollstaendig: ergebnisse.length === STATION_IDS.length,
+      gesamtFehlerpunkte: ergebnisse.reduce((s, e) => s + e.fehlerpunkte, 0),
+      bestanden: gesamtBestanden(ergebnisse),
+      rang: null,
+    };
+  });
+
+  const group = (r: RanglistenEintrag) => (!r.vollstaendig ? 2 : r.bestanden ? 0 : 1);
+  rows.sort(
+    (a, b) =>
+      group(a) - group(b) ||
+      (group(a) === 2 ? b.absolviert - a.absolviert : 0) ||
+      a.gesamtFehlerpunkte - b.gesamtFehlerpunkte ||
+      a.truppName.localeCompare(b.truppName, 'de'),
+  );
+
+  rows.forEach((r, i) => {
+    if (!r.vollstaendig) return;
+    const prev = rows[i - 1];
+    r.rang =
+      prev && prev.vollstaendig && group(prev) === group(r) && prev.gesamtFehlerpunkte === r.gesamtFehlerpunkte
+        ? prev.rang
+        : i + 1;
+  });
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
 // API payloads
 // ---------------------------------------------------------------------------
 
