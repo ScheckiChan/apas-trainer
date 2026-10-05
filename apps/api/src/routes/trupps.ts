@@ -123,6 +123,36 @@ truppsRouter.patch('/:truppId/identitaet', requireAuth, async (req, res) => {
   res.json(toTrupp(updated!, { includeInvite: isAusbilder(req) }));
 });
 
+/**
+ * Deletes a Trupp. Its members keep their accounts and are only detached (exactly like
+ * DELETE /:truppId/teilnehmer/:teilnehmerId: truppId, rolle and joinedAt cleared), so they
+ * become "Ohne Trupp". The Trupp's own Ergebnisse go with it. Instance-wide data (Termine
+ * incl. teilnehmerIds/anwesendIds, Ressourcen) and per-account push subscriptions stay.
+ *
+ * Members and Ergebnisse are cleaned up before the Trupp record is removed, so a crash
+ * mid-way never leaves an account pointing at a Trupp that no longer exists. The cleanup
+ * runs once more afterwards to catch a join/Ergebnis-save that raced in between.
+ */
+truppsRouter.delete('/:truppId', requireAusbilder, async (req, res) => {
+  const trupp = await loadTrupp(req, 'trupp');
+  const aufraeumen = async () => {
+    await db.benutzer.update((items) => {
+      for (const b of items) {
+        if (b.truppId !== trupp.id) continue;
+        b.truppId = null;
+        b.rolle = null;
+        b.joinedAt = null;
+      }
+      return { items, result: undefined };
+    });
+    await db.ergebnisse.remove((e) => e.truppId === trupp.id);
+  };
+  await aufraeumen();
+  await db.trupps.remove((t) => t.id === trupp.id);
+  await aufraeumen();
+  res.status(204).end();
+});
+
 truppsRouter.post('/:truppId/invite/regenerate', requireAusbilder, async (req, res) => {
   const trupp = await loadTrupp(req, 'trupp');
   const updated = await db.trupps.patch(trupp.id, (x) => ({ ...x, inviteToken: randomToken() }));

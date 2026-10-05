@@ -199,6 +199,7 @@ systemRolle, read from storage on every request. Types are in `packages/shared`.
 | `POST /trupps/:inviteToken/beitreten` → `MeResponse`             | signed in, account without Trupp (rate-limited) |
 | `GET /trupps` → `TruppSummary[]`                                 | Ausbilder (with invite) · Prüfer (without) |
 | `POST /trupps` · `PATCH /trupps/:id` · `POST /trupps/:id/invite/regenerate` | Ausbilder                   |
+| `DELETE /trupps/:id` (members kept, detached to "Ohne Trupp"; its Ergebnisse removed) | Ausbilder     |
 | `PATCH /trupps/:id/identitaet` {name?, icon?} → `Trupp`          | Ausbilder · Teilnehmer of that Trupp (else 403) |
 | `GET /trupps/:id`                                                | Ausbilder · Prüfer · member            |
 | `GET /trupps/:id/teilnehmer` → `Teilnehmer[]`                    | Ausbilder · member                     |
