@@ -109,6 +109,51 @@ export function kannErgebnisSpeichern(
 }
 
 // ---------------------------------------------------------------------------
+// Wochentage / Trainingspräferenz
+// ---------------------------------------------------------------------------
+
+/** The 7 weekdays, Monday-first (same order as the Kalender's week grid). Canonical storage order. */
+export const WOCHENTAGE = ['montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag', 'sonntag'] as const;
+export type Wochentag = (typeof WOCHENTAGE)[number];
+
+export const WOCHENTAG_LABELS: Record<Wochentag, string> = {
+  montag: 'Montag',
+  dienstag: 'Dienstag',
+  mittwoch: 'Mittwoch',
+  donnerstag: 'Donnerstag',
+  freitag: 'Freitag',
+  samstag: 'Samstag',
+  sonntag: 'Sonntag',
+};
+
+/** Two-letter labels — identical to the Kalender's column headers (Mo, Di, …). */
+export const WOCHENTAG_KURZ: Record<Wochentag, string> = {
+  montag: 'Mo',
+  dienstag: 'Di',
+  mittwoch: 'Mi',
+  donnerstag: 'Do',
+  freitag: 'Fr',
+  samstag: 'Sa',
+  sonntag: 'So',
+};
+
+export function isWochentag(v: unknown): v is Wochentag {
+  return typeof v === 'string' && (WOCHENTAGE as readonly string[]).includes(v);
+}
+
+/** Valid weekdays only, deduplicated, in canonical Monday-first order. */
+export function normalisiereWochentage(tage: readonly unknown[]): Wochentag[] {
+  const set = new Set(tage.filter(isWochentag));
+  return WOCHENTAGE.filter((t) => set.has(t));
+}
+
+/** Weekday of a date in the local time zone of the caller (browser: the user's local time). */
+export function wochentagVon(date: Date): Wochentag {
+  // getDay(): 0 = Sonntag … 6 = Samstag → shift to Monday-first.
+  return WOCHENTAGE[(date.getDay() + 6) % 7]!;
+}
+
+// ---------------------------------------------------------------------------
 // Entities
 // ---------------------------------------------------------------------------
 
@@ -150,6 +195,12 @@ export interface Benutzer {
   /** APAS-Rolle within the Trupp; always null without a Trupp. */
   rolle: Rolle | null;
   checkliste: Checkliste;
+  /**
+   * Self-reported preferred training days, Monday-first, no duplicates. [] = no preference
+   * set (NOT "every day"). Informational only — never restricts Termin assignment or RSVP.
+   * Only the account itself can change it (PUT /auth/me/trainingspraeferenz).
+   */
+  trainingspraeferenz: Wochentag[];
   createdAt: string;
 }
 
@@ -295,6 +346,8 @@ export interface KalenderPerson {
   truppName: string | null;
   /** The Trupp's chosen icon; null if no Trupp or none chosen yet. */
   truppIcon: TruppIcon | null;
+  /** The person's self-reported preferred days ([] = none set → show no hint). Informational only. */
+  trainingspraeferenz: Wochentag[];
 }
 
 /** A Ressource booked by a Termin for a time window. */
@@ -451,6 +504,15 @@ export interface MeResponse {
   benutzer: Benutzer;
   /** The account's Trupp (null without membership). `inviteToken` only for Ausbilder. */
   trupp: Trupp | null;
+}
+
+/**
+ * PUT /auth/me/trainingspraeferenz — the signed-in account sets its own preferred days
+ * (any systemRolle). Full replacement; [] clears it. Duplicates are dropped and the stored
+ * order is canonical (Monday-first). Responds with MeResponse.
+ */
+export interface TrainingspraeferenzUpdate {
+  tage: Wochentag[];
 }
 
 /** POST /auth/login, POST /auth/registrieren, POST /trupps/:inviteToken/join. */

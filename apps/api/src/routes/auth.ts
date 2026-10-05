@@ -1,4 +1,4 @@
-import type { AuthSession, MeResponse } from '@apas/shared';
+import { normalisiereWochentage, WOCHENTAGE, type AuthSession, type MeResponse } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { db, type BenutzerRecord } from '../db.js';
@@ -91,5 +91,30 @@ authRouter.post('/registrieren', async (req, res) => {
 authRouter.get('/me', requireAuth, async (req, res) => {
   const b = await db.benutzer.get(req.benutzer!.id);
   if (!b) throw new HttpError(401, 'Sitzung abgelaufen oder ungültig — bitte neu anmelden');
+  res.json(await meResponse(b));
+});
+
+// ---------------------------------------------------------------- Trainingspräferenz (own account only)
+
+const trainingspraeferenzSchema = z.object({
+  tage: z
+    .array(z.enum(WOCHENTAGE, { error: 'Ungültiger Wochentag' }))
+    .max(14)
+    .transform((tage) => normalisiereWochentage(tage)),
+});
+
+/**
+ * The signed-in account replaces its own preferred training days (any systemRolle; [] clears).
+ * Deliberately no :id — nobody can set another account's preference, Ausbilder included.
+ * Purely informational: never consulted when assigning Termine or RSVPs.
+ */
+authRouter.put('/me/trainingspraeferenz', requireAuth, async (req, res) => {
+  const { tage } = parseBody(trainingspraeferenzSchema, req);
+  const b = await db.benutzer.update((items) => {
+    const me = items.find((x) => x.id === req.benutzer!.id);
+    if (!me) throw new HttpError(401, 'Sitzung abgelaufen oder ungültig — bitte neu anmelden');
+    me.trainingspraeferenz = tage;
+    return { items, result: me };
+  });
   res.json(await meResponse(b));
 });
