@@ -12,8 +12,6 @@ services:
       DATA_DIR: /data
     volumes:
       - apas-data:/data
-    ports:
-      - "${API_PORT:-3001}:3001"
     restart: unless-stopped
 
   web:
@@ -25,7 +23,7 @@ services:
     depends_on:
       - api
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "192.168.178.151:${WEB_PORT:-8080}:80"
     restart: unless-stopped
 
 volumes:
