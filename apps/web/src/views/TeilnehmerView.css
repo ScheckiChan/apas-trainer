@@ -77,3 +77,35 @@
 .tv-check-head h2 {
   margin: 0;
 }
+
+.tv-tn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tv-tn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--grey-light);
+}
+
+.tv-tn-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tv-tn-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tv-tn .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

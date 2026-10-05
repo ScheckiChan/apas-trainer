@@ -1,9 +1,8 @@
 import {
-  ROLLE_LABELS,
-  ROLLE_SHORT,
   checklistAmpel,
   type ChecklistItem,
   type Gruppe,
+  type Rolle,
   type Ressource,
   type Teilnehmer,
 } from '@apas/shared';
@@ -12,6 +11,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
+import { RolleSelect, RollenAbdeckung, saveRolle } from '../components/Rollen';
 import { api, errorMessage } from '../lib/api';
 import { countdownLabel } from '../lib/format';
 import './GroupDetail.css';
@@ -47,6 +47,15 @@ export function GroupDetail() {
         auth: 'leiter',
         body: { [item]: next },
       });
+      setTeilnehmer((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err) {
+      alert(errorMessage(err));
+    }
+  };
+
+  const changeRolle = async (t: Teilnehmer, rolle: Rolle | null) => {
+    try {
+      const updated = await saveRolle(t.id, rolle, 'leiter');
       setTeilnehmer((list) => list.map((x) => (x.id === updated.id ? updated : x)));
     } catch (err) {
       alert(errorMessage(err));
@@ -115,6 +124,7 @@ export function GroupDetail() {
               <span className="ampel ampel-gruen" /> {bereit} von {teilnehmer.length} bereit
             </span>
           </div>
+          {teilnehmer.length > 0 && <RollenAbdeckung teilnehmer={teilnehmer} />}
           {teilnehmer.length === 0 ? (
             <p className="muted">Noch niemand beigetreten. Teile den Einladungslink oder QR-Code.</p>
           ) : (
@@ -123,19 +133,10 @@ export function GroupDetail() {
                 <li key={t.id} className="gd-tn">
                   <AmpelDot teilnehmer={t} />
                   <div className="gd-tn-main">
-                    <div className="gd-tn-name">
-                      {t.name}
-                      {!t.emailVerified && (
-                        <span className="badge" title="Magic Link noch nicht bestätigt">
-                          unbestätigt
-                        </span>
-                      )}
-                    </div>
-                    <div className="muted">
-                      {t.ff} · <span title={ROLLE_LABELS[t.rolle]}>{ROLLE_SHORT[t.rolle]}</span>
-                      {t.email && <> · {t.email}</>}
-                    </div>
+                    <div className="gd-tn-name">{t.name}</div>
+                    <div className="muted">{t.ff}</div>
                   </div>
+                  <RolleSelect teilnehmer={t} onChange={(rolle) => changeRolle(t, rolle)} />
                   <ChecklistToggles teilnehmer={t} compact onToggle={(item) => toggle(t, item)} />
                   <button
                     type="button"

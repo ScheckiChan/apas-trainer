@@ -1,5 +1,4 @@
 import {
-  ROLLE_SHORT,
   type BuchungsKonflikt,
   type Ressource,
   type Teilnehmer,
@@ -9,6 +8,7 @@ import {
   type TerminTyp,
 } from '@apas/shared';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { rolleShort } from '../components/Rollen';
 import { api, errorMessage } from '../lib/api';
 import { formatDateTime, formatTime, localToIso, toLocalDateKey, toLocalTime } from '../lib/format';
 import './Calendar.css';
@@ -446,7 +446,7 @@ function TerminEditor({
                     <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleTn(t.id)} />
                     <span>{t.name}</span>
                     <span className="muted">
-                      {ROLLE_SHORT[t.rolle]} · {t.ff}
+                      {rolleShort(t.rolle)} · {t.ff}
                     </span>
                   </label>
                 ))}

@@ -1,7 +1,7 @@
 import type { LoginResponse } from '@apas/shared';
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api, errorMessage, setToken } from '../lib/api';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { api, errorMessage, lastInvite, setToken } from '../lib/api';
 import './Login.css';
 
 export function Login() {
@@ -18,7 +18,7 @@ export function Login() {
       </div>
       <div className={`login-cards ${teilnehmerFirst ? 'login-cards-reverse' : ''}`}>
         <LeiterLogin onSuccess={() => navigate('/gruppen', { replace: true })} />
-        <TeilnehmerRelink />
+        <TeilnehmerHint />
       </div>
     </div>
   );
@@ -84,57 +84,24 @@ function LeiterLogin({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-/** Teilnehmer have no password: re-entry always goes through a fresh magic link. */
-function TeilnehmerRelink() {
-  const [email, setEmail] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await api('/auth/teilnehmer/request-link', { method: 'POST', auth: 'none', body: { email } });
-      setSent(true);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
+/**
+ * Teilnehmer accounts belong to one Gruppe, so they sign in on that Gruppe's invite link
+ * (Name + Passwort). The last used link is remembered on this device.
+ */
+function TeilnehmerHint() {
+  const invite = lastInvite();
   return (
-    <form className="card stack" onSubmit={submit}>
+    <section className="card stack">
       <h2>Teilnehmer</h2>
       <p className="muted">
-        Kein Passwort nötig. Gib die E-Mail-Adresse ein, mit der du dich angemeldet hast — wir schicken dir einen
-        neuen Anmeldelink. Neu dabei? Nutze den Einladungslink deines Ausbildungsleiters.
+        Öffne den Einladungslink (oder QR-Code) deiner Übungsgruppe und wähle dort „Anmelden" — mit deinem Namen und
+        Passwort. Neu dabei? Über denselben Link kannst du beitreten.
       </p>
-      {error && <div className="alert alert-error">{error}</div>}
-      {sent ? (
-        <div className="alert alert-ok">
-          Falls diese Adresse registriert ist, ist ein Anmeldelink unterwegs. Bitte prüfe dein Postfach.
-        </div>
-      ) : (
-        <>
-          <div className="field">
-            <label htmlFor="relink-email">E-Mail</label>
-            <input
-              id="relink-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <button className="btn btn-secondary" type="submit" disabled={busy}>
-            {busy ? 'Senden…' : 'Anmeldelink anfordern'}
-          </button>
-        </>
+      {invite && (
+        <Link className="btn btn-secondary" to={`/join/${encodeURIComponent(invite.token)}?anmelden`}>
+          Anmelden bei „{invite.gruppeName}"
+        </Link>
       )}
-    </form>
+    </section>
   );
 }

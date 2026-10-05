@@ -37,10 +37,36 @@
   width: 100%;
 }
 
-.join-sent {
-  text-align: center;
+.join-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 0.25rem;
 }
 
-.join-sent-icon {
-  font-size: 2.5rem;
+.join .join-tab {
+  flex: 1;
+  font: inherit;
+  font-weight: 600;
+  border: 0;
+  background: transparent;
+  padding: 0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--grey);
+}
+
+.join .join-tab-active {
+  background: var(--red);
+  color: #fff;
+}
+
+.join .join-switch {
+  width: auto;
+  margin-top: 0.5rem;
+}
+
+.join-hint {
+  margin: 0.25rem 0 0;
 }

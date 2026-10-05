@@ -1,0 +1,76 @@
+import {
+  ROLLE_LABELS,
+  ROLLE_SHORT,
+  ROLLEN,
+  rollenBesetzung,
+  type Rolle,
+  type RolleUpdate,
+  type Teilnehmer,
+} from '@apas/shared';
+import { api, type AuthKind } from '../lib/api';
+import './Rollen.css';
+
+/** PATCH /teilnehmer/:id/rolle — usable by the Ausbildungsleiter and every Teilnehmer of the Gruppe. */
+export function saveRolle(teilnehmerId: string, rolle: Rolle | null, auth: Exclude<AuthKind, 'none'>) {
+  const body: RolleUpdate = { rolle };
+  return api<Teilnehmer>(`/teilnehmer/${teilnehmerId}/rolle`, { method: 'PATCH', auth, body });
+}
+
+export function RolleSelect({
+  teilnehmer,
+  onChange,
+  disabled,
+}: {
+  teilnehmer: Teilnehmer;
+  onChange: (rolle: Rolle | null) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <select
+      className="rolle-select"
+      value={teilnehmer.rolle ?? ''}
+      disabled={disabled}
+      onChange={(e) => onChange((e.target.value || null) as Rolle | null)}
+      aria-label={`Rolle von ${teilnehmer.name}`}
+      title={teilnehmer.rolle ? ROLLE_LABELS[teilnehmer.rolle] : 'Noch keine Rolle'}
+    >
+      <option value="">— keine Rolle —</option>
+      {ROLLEN.map((r) => (
+        <option key={r} value={r}>
+          {ROLLE_SHORT[r]} — {ROLLE_LABELS[r]}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * "3/4 Rollen besetzt" plus one chip per Rolle. Informational only — a Rolle may be held
+ * by several Teilnehmer (Ergänzungsteilnehmer), shown as "×2".
+ */
+export function RollenAbdeckung({ teilnehmer }: { teilnehmer: Teilnehmer[] }) {
+  const counts = rollenBesetzung(teilnehmer);
+  const besetzt = ROLLEN.filter((r) => counts[r] > 0).length;
+  return (
+    <div className="rollen-abdeckung">
+      <strong className={besetzt === ROLLEN.length ? 'rollen-voll' : ''}>
+        {besetzt}/{ROLLEN.length} Rollen besetzt
+      </strong>
+      <span className="rollen-chips">
+        {ROLLEN.map((r) => (
+          <span
+            key={r}
+            className={`rollen-chip ${counts[r] > 0 ? 'rollen-chip-ok' : ''}`}
+            title={`${ROLLE_LABELS[r]}: ${counts[r] === 0 ? 'unbesetzt' : `${counts[r]}× besetzt`}`}
+          >
+            {ROLLE_SHORT[r]}
+            {counts[r] > 1 && <small> ×{counts[r]}</small>}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+export const rolleShort = (rolle: Rolle | null): string => (rolle ? ROLLE_SHORT[rolle] : 'keine Rolle');
+export const rolleLabel = (rolle: Rolle | null): string => (rolle ? ROLLE_LABELS[rolle] : 'noch keine Rolle');

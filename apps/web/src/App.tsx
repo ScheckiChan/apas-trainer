@@ -7,7 +7,6 @@ import { GroupDetail } from './views/GroupDetail';
 import { GroupsDashboard } from './views/GroupsDashboard';
 import { Join } from './views/Join';
 import { Login } from './views/Login';
-import { MagicLinkVerify } from './views/MagicLinkVerify';
 import { Stations } from './views/Stations';
 import { TeilnehmerView } from './views/TeilnehmerView';
 
@@ -67,7 +66,6 @@ export function App() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/join/:token" element={<Join />} />
-      <Route path="/auth/verify" element={<MagicLinkVerify />} />
       <Route path="/stationen" element={<StationsPage />} />
 
       <Route path="/gruppen" element={<RequireLeiter><GroupsDashboard /></RequireLeiter>} />

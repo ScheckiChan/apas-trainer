@@ -1,0 +1,39 @@
+.rolle-select {
+  width: auto;
+  max-width: 13rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.rollen-abdeckung {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+.rollen-voll {
+  color: var(--green);
+}
+
+.rollen-chips {
+  display: inline-flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.rollen-chip {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px dashed var(--grey);
+  color: var(--grey);
+}
+
+.rollen-chip-ok {
+  border: 1px solid var(--green);
+  background: #e8f5e9;
+  color: #1b5e20;
+}

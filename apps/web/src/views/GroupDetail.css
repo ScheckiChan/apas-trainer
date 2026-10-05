@@ -75,6 +75,10 @@
   white-space: nowrap;
 }
 
+.gd-section-head + .rollen-abdeckung {
+  margin-bottom: 0.5rem;
+}
+
 .gd-remove {
   color: var(--grey);
 }

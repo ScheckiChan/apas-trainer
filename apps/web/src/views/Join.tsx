@@ -1,37 +1,73 @@
-import { ROLLE_LABELS, ROLLEN, type JoinInfo, type JoinRequest, type Rolle } from '@apas/shared';
+import type { JoinInfo, JoinRequest, TeilnehmerLoginRequest, TeilnehmerSession } from '@apas/shared';
 import { useEffect, useState, type FormEvent } from 'react';
-import { useParams } from 'react-router-dom';
-import { api, errorMessage } from '../lib/api';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { HttpError, api, errorMessage, lastInvite, rememberInvite, setToken } from '../lib/api';
 import { formatDate } from '../lib/format';
 import './Join.css';
 
+type Mode = 'neu' | 'anmelden';
+
+/**
+ * /join/:token — "Neu beitreten" (Name, FF, Passwort) or "Anmelden" (Name, Passwort).
+ * Both are scoped to this Gruppe's invite token and log in straight away.
+ */
 export function Join() {
-  const { token } = useParams();
+  const { token = '' } = useParams();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
   const [info, setInfo] = useState<JoinInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [form, setForm] = useState<JoinRequest>({ name: '', ff: '', rolle: 'ATF_ATM1', email: '' });
+  const [mode, setMode] = useState<Mode>(() =>
+    params.has('anmelden') || lastInvite()?.token === token ? 'anmelden' : 'neu',
+  );
+  const [name, setName] = useState('');
+  const [ff, setFf] = useState('');
+  const [password, setPassword] = useState('');
+  const [repeat, setRepeat] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  // Join rejected because the name is taken → offer the switch to "Anmelden".
+  const [nameTaken, setNameTaken] = useState(false);
+
+  const base = `/gruppen/${encodeURIComponent(token)}`;
 
   useEffect(() => {
-    api<JoinInfo>(`/join/${encodeURIComponent(token ?? '')}`, { auth: 'none' })
+    api<JoinInfo>(`${base}/join`, { auth: 'none' })
       .then(setInfo)
       .catch((err) => setLoadError(errorMessage(err)));
-  }, [token]);
+  }, [base]);
 
-  const update = <K extends keyof JoinRequest>(key: K, value: JoinRequest[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
+  const switchMode = (m: Mode) => {
+    setMode(m);
+    setError(null);
+    setNameTaken(false);
+    setPassword('');
+    setRepeat('');
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    setNameTaken(false);
+    if (mode === 'neu' && password !== repeat) {
+      setError('Die Passwörter stimmen nicht überein.');
+      return;
+    }
+    setBusy(true);
     try {
-      await api(`/join/${encodeURIComponent(token ?? '')}`, { method: 'POST', auth: 'none', body: form });
-      setSentTo(form.email);
+      const body: JoinRequest | TeilnehmerLoginRequest =
+        mode === 'neu' ? { name, ff, password } : { name, password };
+      const session = await api<TeilnehmerSession>(`${base}/${mode === 'neu' ? 'join' : 'login'}`, {
+        method: 'POST',
+        auth: 'none',
+        body,
+      });
+      setToken('teilnehmer', session.token);
+      rememberInvite({ token, gruppeName: session.gruppe.name });
+      navigate('/teilnehmer', { replace: true });
     } catch (err) {
       setError(errorMessage(err));
+      setNameTaken(mode === 'neu' && err instanceof HttpError && err.status === 409);
     } finally {
       setBusy(false);
     }
@@ -46,7 +82,7 @@ export function Join() {
             <h1>APAS-Trainer</h1>
             {info && (
               <p>
-                Einladung zur Übungsgruppe <strong>{info.gruppeName}</strong>
+                Übungsgruppe <strong>{info.gruppeName}</strong>
                 {info.pruefungstermin && <> · Prüfung am {formatDate(info.pruefungstermin)}</>}
               </p>
             )}
@@ -55,25 +91,44 @@ export function Join() {
 
         {loadError && <div className="alert alert-error">{loadError}</div>}
 
-        {info && sentTo && (
-          <div className="card stack join-sent">
-            <div className="join-sent-icon">✉️</div>
-            <h2>Prüfe dein E-Mail-Postfach</h2>
-            <p>
-              Wir haben einen Anmeldelink an <strong>{sentTo}</strong> geschickt. Klicke auf den Link, um deine
-              Anmeldung zu bestätigen. Der Link ist nur kurze Zeit gültig.
-            </p>
-            {import.meta.env.DEV && (
-              <p className="muted">Entwicklungsmodus: Der Link wird in der Konsole der API ausgegeben.</p>
-            )}
-          </div>
-        )}
-
-        {info && !sentTo && (
+        {info && (
           <form className="card stack" onSubmit={submit}>
-            <h2>Anmeldung</h2>
-            <p className="muted">Kein Passwort nötig — du bekommst einen Anmeldelink per E-Mail.</p>
-            {error && <div className="alert alert-error">{error}</div>}
+            <div className="join-tabs" role="tablist">
+              {(
+                [
+                  ['neu', 'Neu beitreten'],
+                  ['anmelden', 'Anmelden'],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === key}
+                  className={`join-tab ${mode === key ? 'join-tab-active' : ''}`}
+                  onClick={() => switchMode(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="muted">
+              {mode === 'neu'
+                ? 'Lege dein Konto für diese Gruppe an. Deine Rolle wird später gemeinsam in der Gruppe eingeteilt.'
+                : 'Schon beigetreten? Melde dich mit deinem Namen und Passwort an.'}
+            </p>
+            {error && (
+              <div className="alert alert-error">
+                {error}
+                {nameTaken && (
+                  <div>
+                    <button type="button" className="btn btn-secondary btn-small join-switch" onClick={() => switchMode('anmelden')}>
+                      Zu „Anmelden" wechseln
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <div className="field">
                 <label htmlFor="join-name">Name</label>
@@ -81,46 +136,59 @@ export function Join() {
                   id="join-name"
                   required
                   minLength={2}
-                  autoComplete="name"
-                  value={form.name}
-                  onChange={(e) => update('name', e.target.value)}
+                  maxLength={100}
+                  autoComplete="username"
+                  placeholder={mode === 'neu' ? 'z. B. Max Mustermann' : undefined}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
               </div>
+              {mode === 'neu' && (
+                <div className="field">
+                  <label htmlFor="join-ff">Feuerwehr</label>
+                  <input
+                    id="join-ff"
+                    required
+                    minLength={2}
+                    maxLength={100}
+                    placeholder="z. B. FF Musterdorf"
+                    value={ff}
+                    onChange={(e) => setFf(e.target.value)}
+                  />
+                </div>
+              )}
               <div className="field">
-                <label htmlFor="join-ff">Feuerwehr</label>
+                <label htmlFor="join-password">Passwort</label>
                 <input
-                  id="join-ff"
+                  id="join-password"
+                  type="password"
                   required
-                  minLength={2}
-                  placeholder="z. B. FF Musterdorf"
-                  value={form.ff}
-                  onChange={(e) => update('ff', e.target.value)}
+                  minLength={mode === 'neu' ? 8 : undefined}
+                  maxLength={mode === 'neu' ? 72 : undefined}
+                  autoComplete={mode === 'neu' ? 'new-password' : 'current-password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              <div className="field">
-                <label htmlFor="join-rolle">Rolle</label>
-                <select id="join-rolle" value={form.rolle} onChange={(e) => update('rolle', e.target.value as Rolle)}>
-                  {ROLLEN.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLLE_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="join-email">E-Mail</label>
-                <input
-                  id="join-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={form.email}
-                  onChange={(e) => update('email', e.target.value)}
-                />
-              </div>
+              {mode === 'neu' && (
+                <div className="field">
+                  <label htmlFor="join-repeat">Passwort wiederholen</label>
+                  <input
+                    id="join-repeat"
+                    type="password"
+                    required
+                    minLength={8}
+                    maxLength={72}
+                    autoComplete="new-password"
+                    value={repeat}
+                    onChange={(e) => setRepeat(e.target.value)}
+                  />
+                  <p className="muted join-hint">Mindestens 8 Zeichen.</p>
+                </div>
+              )}
             </div>
             <button className="btn" type="submit" disabled={busy}>
-              {busy ? 'Senden…' : 'Anmeldelink anfordern'}
+              {busy ? 'Bitte warten…' : mode === 'neu' ? 'Beitreten' : 'Anmelden'}
             </button>
           </form>
         )}

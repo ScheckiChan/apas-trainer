@@ -73,3 +73,29 @@ export async function api<T>(
 
 export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : 'Unbekannter Fehler';
+
+/**
+ * Teilnehmer log in via their Gruppe's invite link (identity = Gruppe + Name). The last
+ * used link is remembered so the Login page can send returning Teilnehmer back to it.
+ */
+export interface LastInvite {
+  token: string;
+  gruppeName: string;
+}
+
+const LAST_INVITE_KEY = 'apas.lastInvite';
+
+export function rememberInvite(invite: LastInvite): void {
+  localStorage.setItem(LAST_INVITE_KEY, JSON.stringify(invite));
+}
+
+export function lastInvite(): LastInvite | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_INVITE_KEY) ?? 'null') as Partial<LastInvite> | null;
+    return v && typeof v.token === 'string' && typeof v.gruppeName === 'string'
+      ? { token: v.token, gruppeName: v.gruppeName }
+      : null;
+  } catch {
+    return null;
+  }
+}
