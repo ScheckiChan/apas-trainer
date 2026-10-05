@@ -20,8 +20,10 @@ Atemschutztrupps with the roles GKDT, ATF/ATM1, ATM2 and Wassertruppführer).
 - The **APAS-Rolle** (GKDT, ATF/ATM1, ATM2, Wassertruppführer) is a separate thing: the
   position a person holds inside their Trupp, assigned there by any Ausbilder or anyone in
   the Trupp.
-- Push reminders go out N hours before each Termin to its assigned people and every
-  Ausbilder.
+- Push reminders go out N hours before each Termin to its assigned people, everyone who
+  confirmed attendance, and every Ausbilder. A new Fixtermin is also pushed right away.
+- On a Fixtermin anyone can mark themselves "anwesend" ("Ich bin dabei"); Ausbilder see
+  the list and may add or remove anyone.
 
 ## Repository layout
 
@@ -218,6 +220,7 @@ systemRolle, read from storage on every request. Types are in `packages/shared`.
 | `PUT/DELETE /termine/:terminId`                                  | Ausbilder, or creator of an Individualübung |
 | `POST /termine/konflikte` {ressourceId, start, ende, excludeTerminId?} | signed in                        |
 | `GET /termine/personen` (every account + Trupp name)             | signed in                              |
+| `PUT/DELETE /termine/:terminId/anwesend/:benutzerId` (Fixtermin only, returns the Termin) | self; Ausbilder: anyone |
 | `GET /trupps/:id/ergebnisse`                                     | Ausbilder · Prüfer · member            |
 | `PUT /trupps/:id/ergebnisse/:stationId` {zeitSekunden, fehlerpunkte, teile?} | Ausbilder · Prüfer: any Trupp; Teilnehmer: own Trupp (else 403) |
 | `GET /rangliste` (one leaderboard per station)                   | signed in                              |
@@ -630,10 +633,30 @@ Things SPEC.md left open and how they were resolved:
 - Datetimes are stored as UTC ISO strings and shown in the browser's local time. The
   Prüfungstermin is a plain `YYYY-MM-DD` date with no timezone.
 
+**Anwesenheit (RSVP) on Fixtermine**
+- `anwesendIds` is separate from `teilnehmerIds`: the Ausbilder's assignment says who is
+  invited, `anwesendIds` says who confirmed. Individualübungen don't have it (always
+  `[]`; switching a Fixtermin to an Individualübung clears it).
+- `PUT`/`DELETE /termine/:terminId/anwesend/:benutzerId`, idempotent, applied atomically
+  inside `db.termine.patch`. Every account (Teilnehmer, Prüfer, Ausbilder) may toggle only
+  itself; Ausbilder may also mark anyone present or remove them, for people without the
+  app at hand. Anyone may confirm, not just the invited people — it's a shared calendar.
+  No cut-off date: past Fixtermine can still be corrected.
+- The calendar shows "N angemeldet" in "Nächste Termine" and in the month grid's tooltip
+  (the chips are too small to print it); the Termin pop-up has the "Ich bin dabei" /
+  "Absagen" toggle and the full name list. Deleting an account removes it from
+  `anwesendIds`. Existing `termine.json` records get `anwesendIds: []` on API start
+  (`migrateAnwesend`, idempotent).
+
 **Push reminders**
-- Reminders go to the Termin's assigned accounts (any Trupp) and to every Ausbilder, and
-  link to `/kalender`. Push subscriptions belong to the account (`owner: { kind:
-  'benutzer', id }`).
+- Reminders go to the Termin's assigned accounts (any Trupp), the accounts that
+  confirmed attendance, and every Ausbilder, and link to `/kalender`. Push subscriptions
+  belong to the account (`owner: { kind: 'benutzer', id }`).
+- **New Fixtermin:** right after an Ausbilder creates one, a push "Neuer Übungstermin:
+  {Titel}" with date/time goes out (linking to `/kalender`) — same targeting as the
+  reminders (assigned accounts + every Ausbilder), minus the creator. Not on edits, never
+  for Individualübungen (that would be noise for everyone). It is sent after the response,
+  so a push failure never affects saving.
 - One reminder per Termin per start time. Moving a Termin re-arms it. The reminder is
   recorded *before* sending (at-most-once, so a crash never causes duplicates). A
   Termin created less than `REMINDER_HOURS_BEFORE` ahead gets its reminder on the

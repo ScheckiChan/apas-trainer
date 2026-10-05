@@ -14,7 +14,7 @@ import { AppHeader } from '../components/AppHeader';
 import { Icon } from '../components/Icon';
 import { rolleShort } from '../components/Rollen';
 import { TruppName } from '../components/TruppName';
-import { api, errorMessage } from '../lib/api';
+import { api, errorMessage, setAnwesend } from '../lib/api';
 import { formatDateTime, formatTime, localToIso, toLocalDateKey, toLocalTime } from '../lib/format';
 import { useMe } from '../lib/session';
 import './Calendar.css';
@@ -72,6 +72,11 @@ function personDetail(p: KalenderPerson): string {
   const rolle =
     p.systemRolle !== 'teilnehmer' ? SYSTEM_ROLLE_LABELS[p.systemRolle] : p.truppId ? rolleShort(p.rolle) : null;
   return [rolle, p.ff].filter(Boolean).join(' · ');
+}
+
+/** "5 angemeldet" — self-RSVP count, Fixtermine only (null for Individualübungen). */
+function angemeldetLabel(t: Termin): string | null {
+  return t.typ === 'fix' ? `${(t.anwesendIds ?? []).length} angemeldet` : null;
 }
 
 /** /kalender — the one shared calendar of this Ausbildung, for every account. */
@@ -234,21 +239,25 @@ export function Calendar({ ausbilder, currentId }: CalendarProps) {
               onClick={() => setEditor({ mode: 'create', typ: ausbilder ? 'fix' : 'individual', date: key })}
             >
               <div className="cal-day-num num">{day.getDate()}</div>
-              {items.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`cal-chip ${t.typ === 'fix' ? 'cal-fix' : 'cal-individual'}`}
-                  title={`${formatTime(t.start)}–${formatTime(t.ende)} ${t.titel}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditor({ mode: 'edit', termin: t });
-                  }}
-                >
-                  <span className="sr-only">{t.typ === 'fix' ? 'Fixtermin' : 'Individualübung'}: </span>
-                  <span className="cal-chip-time num">{formatTime(t.start)}</span> {t.titel}
-                </button>
-              ))}
+              {items.map((t) => {
+                const angemeldet = angemeldetLabel(t);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`cal-chip ${t.typ === 'fix' ? 'cal-fix' : 'cal-individual'}`}
+                    title={`${formatTime(t.start)}–${formatTime(t.ende)} ${t.titel}${angemeldet ? ` · ${angemeldet}` : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditor({ mode: 'edit', termin: t });
+                    }}
+                  >
+                    <span className="sr-only">{t.typ === 'fix' ? 'Fixtermin' : 'Individualübung'}: </span>
+                    <span className="cal-chip-time num">{formatTime(t.start)}</span> {t.titel}
+                    {angemeldet && <span className="sr-only">, {angemeldet}</span>}
+                  </button>
+                );
+              })}
             </div>
           );
         })}
@@ -268,6 +277,12 @@ export function Calendar({ ausbilder, currentId }: CalendarProps) {
                   <span className="cal-agenda-title">{t.titel}</span>
                   {t.ressourceId && (
                     <span className="muted">· {ressourcen.find((r) => r.id === t.ressourceId)?.name ?? 'Ressource'}</span>
+                  )}
+                  {t.typ === 'fix' && (
+                    <span className="badge cal-agenda-count">
+                      <Icon name="user-round-check" size="1em" />
+                      {angemeldetLabel(t)}
+                    </span>
                   )}
                 </button>
               </li>
@@ -293,6 +308,7 @@ export function Calendar({ ausbilder, currentId }: CalendarProps) {
           personen={personen}
           ressourcen={ressourcen}
           onClose={() => setEditor(null)}
+          onTerminChanged={(updated) => setTermine((list) => list.map((t) => (t.id === updated.id ? updated : t)))}
           onSaved={() => {
             setEditor(null);
             void loadTermine();
@@ -312,6 +328,7 @@ function TerminEditor({
   personen,
   ressourcen,
   onClose,
+  onTerminChanged,
   onSaved,
 }: {
   state: NonNullable<EditorState>;
@@ -320,6 +337,8 @@ function TerminEditor({
   personen: KalenderPerson[];
   ressourcen: Ressource[];
   onClose: () => void;
+  /** A change that keeps the editor open (Anwesenheit) — the calendar updates its copy. */
+  onTerminChanged: (termin: Termin) => void;
   onSaved: () => void;
 }) {
   const existing = state.mode === 'edit' ? state.termin : null;
@@ -474,6 +493,16 @@ function TerminEditor({
           </div>
         )}
 
+        {existing && existing.typ === 'fix' && (
+          <AnwesendPanel
+            termin={existing}
+            ausbilder={ausbilder}
+            currentId={currentId}
+            personen={personen}
+            onChanged={onTerminChanged}
+          />
+        )}
+
         <fieldset disabled={!canEdit || busy} className="cal-fieldset">
           <div className="field">
             <label htmlFor="t-titel">Titel</label>
@@ -603,6 +632,162 @@ function TerminEditor({
         </div>
       </form>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- Anwesenheit (Fixtermine)
+
+/**
+ * Self-RSVP on a Fixtermin, separate from the assigned teilnehmerIds: everyone toggles
+ * themselves, Ausbilder may additionally add or remove anyone (e.g. someone without the app).
+ * Lives inside the editor <form>, so every button is type="button".
+ */
+function AnwesendPanel({
+  termin,
+  ausbilder,
+  currentId,
+  personen,
+  onChanged,
+}: {
+  termin: Termin;
+  ausbilder: boolean;
+  currentId: string;
+  personen: KalenderPerson[];
+  onChanged: (termin: Termin) => void;
+}) {
+  const [anwesendIds, setAnwesendIds] = useState<string[]>(termin.anwesendIds ?? []);
+  /** Benutzer id whose request is in flight. */
+  const [pending, setPending] = useState<string | null>(null);
+  const [addId, setAddId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const anwesend = new Set(anwesendIds);
+  const ichBinDabei = anwesend.has(currentId);
+  // Server order (Trupp, then name); ids without a known account last.
+  const known = personen.filter((p) => anwesend.has(p.id));
+  const unknown = anwesendIds.filter((id) => !personen.some((p) => p.id === id));
+  const addable = byTrupp(personen.filter((p) => !anwesend.has(p.id)));
+
+  const toggle = async (benutzerId: string, next: boolean) => {
+    setPending(benutzerId);
+    setError(null);
+    try {
+      const updated = await setAnwesend(termin.id, benutzerId, next);
+      setAnwesendIds(updated.anwesendIds ?? []);
+      onChanged(updated);
+      if (benutzerId === addId) setAddId('');
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const nameOf = (p: KalenderPerson) => (p.id === currentId ? `${p.name} (du)` : p.name);
+
+  return (
+    <section className="cal-rsvp stack" aria-labelledby={`rsvp-${termin.id}`}>
+      <h3 id={`rsvp-${termin.id}`} className="cal-rsvp-head">
+        Anwesenheit <span className="badge num">{anwesendIds.length} angemeldet</span>
+      </h3>
+
+      <div className="cal-rsvp-me">
+        <span className={`cal-rsvp-status ${ichBinDabei ? 'cal-rsvp-status-on' : ''}`} role="status">
+          <Icon name={ichBinDabei ? 'circle-check' : 'circle-dashed'} />
+          {ichBinDabei ? 'Du bist angemeldet.' : 'Du bist noch nicht angemeldet.'}
+        </span>
+        <button
+          type="button"
+          className={`btn ${ichBinDabei ? 'btn-secondary' : ''}`}
+          disabled={pending !== null}
+          aria-busy={pending === currentId}
+          onClick={() => void toggle(currentId, !ichBinDabei)}
+        >
+          <Icon name={ichBinDabei ? 'x' : 'check'} />
+          {pending === currentId ? 'Speichern…' : ichBinDabei ? 'Absagen' : 'Ich bin dabei'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="alert alert-error" role="alert">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{error}</div>
+        </div>
+      )}
+
+      {anwesendIds.length === 0 ? (
+        <p className="muted">Noch niemand hat sich angemeldet.</p>
+      ) : (
+        <ul className="cal-rsvp-list">
+          {known.map((p) => (
+            <li key={p.id}>
+              <span className="cal-rsvp-name">
+                {nameOf(p)}
+                {p.truppName && <span className="muted"> ({p.truppName})</span>}
+                <span className="muted cal-rsvp-detail">{personDetail(p)}</span>
+              </span>
+              {ausbilder && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon cal-res-remove"
+                  disabled={pending !== null}
+                  aria-busy={pending === p.id}
+                  onClick={() => void toggle(p.id, false)}
+                  aria-label={`${p.name} austragen`}
+                  title="Austragen"
+                >
+                  <Icon name="x" />
+                </button>
+              )}
+            </li>
+          ))}
+          {unknown.map((id) => (
+            <li key={id}>
+              <span className="cal-rsvp-name muted">Unbekanntes Konto</span>
+              {ausbilder && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon cal-res-remove"
+                  disabled={pending !== null}
+                  onClick={() => void toggle(id, false)}
+                  aria-label="Unbekanntes Konto austragen"
+                  title="Austragen"
+                >
+                  <Icon name="x" />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {ausbilder && addable.length > 0 && (
+        <div className="cal-rsvp-add">
+          <select aria-label="Person als anwesend eintragen" value={addId} onChange={(e) => setAddId(e.target.value)}>
+            <option value="">Person eintragen …</option>
+            {addable.map((g) => (
+              <optgroup key={g.key || 'ohne'} label={g.truppName}>
+                {g.personen.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {nameOf(p)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={!addId || pending !== null}
+            aria-busy={!!addId && pending === addId}
+            onClick={() => void toggle(addId, true)}
+          >
+            <Icon name="user-plus" />
+            Eintragen
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

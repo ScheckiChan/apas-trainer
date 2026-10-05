@@ -221,6 +221,26 @@ export function migrateTruppIcon(dataDir: string): void {
   console.log(`[migrate] trupps.json: icon: null ergänzt (${changed})`);
 }
 
+/**
+ * RSVP on Fixtermine: every Termin gets `anwesendIds: []` if it has none (non-array values
+ * are reset to []). Additive only; idempotent.
+ */
+export function migrateAnwesend(dataDir: string): void {
+  const file = path.join(dataDir, 'termine.json');
+  if (!existsSync(file)) return;
+  const items = readArray(file);
+  let changed = 0;
+  for (const item of items) {
+    if (!Array.isArray(item.anwesendIds)) {
+      item.anwesendIds = [];
+      changed++;
+    }
+  }
+  if (changed === 0) return;
+  writeArray(file, items);
+  console.log(`[migrate] termine.json: anwesendIds ergänzt (${changed})`);
+}
+
 /** Every migration, in order. Run before the first collection is read (API start, seed script). */
 export function runMigrations(dataDir: string): void {
   if (!existsSync(dataDir)) return;
@@ -228,4 +248,5 @@ export function runMigrations(dataDir: string): void {
   migrateSharedCalendar(dataDir);
   migrateBenutzer(dataDir);
   migrateTruppIcon(dataDir);
+  migrateAnwesend(dataDir);
 }

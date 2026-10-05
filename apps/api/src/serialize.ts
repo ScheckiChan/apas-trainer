@@ -93,6 +93,8 @@ export function toTermin(t: TerminRecord): Termin {
     start: t.start,
     ende: t.ende,
     teilnehmerIds: t.teilnehmerIds,
+    // Defensive: records written before migrateAnwesend lack the field.
+    anwesendIds: t.typ === 'fix' ? (t.anwesendIds ?? []) : [],
     ressourceId: t.ressourceId,
     createdBy: t.createdBy,
   };
