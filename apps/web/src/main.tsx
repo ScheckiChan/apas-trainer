@@ -1,4 +1,5 @@
-// Global base styles first so per-view CSS can override them.
+// Tokens + global base styles first so per-view CSS can override them.
+import './tokens.css';
 import './index.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

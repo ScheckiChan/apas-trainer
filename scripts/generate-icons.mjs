@@ -10,8 +10,8 @@ import { deflateSync } from 'node:zlib';
 const outDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'web', 'public', 'icons');
 mkdirSync(outDir, { recursive: true });
 
-const RED = [183, 28, 28];
-const DARK = [29, 31, 36];
+const RED = [206, 11, 35]; // --accent-fill (Feuerwehr-Rot, deepened for 5.7:1 under white)
+const DARK = [34, 23, 22]; // --ink
 const WHITE = [255, 255, 255];
 
 const crcTable = new Uint32Array(256).map((_, n) => {

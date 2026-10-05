@@ -1,6 +1,7 @@
 /* APAS-Trainer service worker.
  *
- * - Precaches the app shell; hashed /assets/* files are cached on first use.
+ * - Precaches the app shell (incl. the self-hosted Switzer fonts); hashed
+ *   /assets/* files are cached on first use.
  * - Navigations are network-first (falls back to the cached shell offline), so a
  *   normal reload always picks up a new deploy.
  * - Bump CACHE on every change to this file / the shell list: the new worker
@@ -8,7 +9,7 @@
  *   so the update is live on the next reload.
  * - /api/* is never cached.
  */
-const CACHE = 'apas-trainer-v1';
+const CACHE = 'apas-trainer-v2';
 
 const SHELL = [
   '/',
@@ -18,6 +19,10 @@ const SHELL = [
   '/icons/icon-512.png',
   '/icons/icon-maskable-512.png',
   '/icons/apple-touch-icon.png',
+  '/fonts/switzer-400.woff2',
+  '/fonts/switzer-500.woff2',
+  '/fonts/switzer-600.woff2',
+  '/fonts/switzer-700.woff2',
 ];
 
 self.addEventListener('install', (event) => {
@@ -65,7 +70,7 @@ self.addEventListener('fetch', (event) => {
       (cached) =>
         cached ||
         fetch(req).then((res) => {
-          if (res.ok && (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/'))) {
+          if (res.ok && (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/') || url.pathname.startsWith('/fonts/'))) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(req, copy));
           }

@@ -1,0 +1,138 @@
+/*
+ * Design tokens — the only place raw colour, type, spacing and motion values live.
+ * Views reference these custom properties; no hex values in per-view CSS.
+ *
+ * Light-first (daylight / Feuerwehrhaus), dark follows the OS (night training).
+ * One accent: Feuerwehr-Rot #fe1e34. It fails 4.5:1 as text or under white text, so
+ * fills with text and red text use the deeper --accent-fill / --accent-text steps.
+ * All greys are tinted towards the accent hue (oklch H 25).
+ */
+
+@font-face {
+  font-family: 'Switzer';
+  src: url('/fonts/switzer-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Switzer';
+  src: url('/fonts/switzer-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Switzer';
+  src: url('/fonts/switzer-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Switzer';
+  src: url('/fonts/switzer-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* ---------- Colour (light) ---------- */
+  --bg: oklch(0.968 0.006 25); /* page */
+  --surface: oklch(0.995 0.002 25); /* cards, header, inputs */
+  --surface-raised: oklch(1 0 0); /* active step, flashcard front */
+  --surface-sunk: oklch(0.945 0.008 25); /* segmented controls, table heads */
+  --border: oklch(0.88 0.012 25);
+  --border-strong: oklch(0.78 0.016 25);
+  --ink: oklch(0.22 0.018 25); /* 15.9:1 on --bg */
+  --muted: oklch(0.47 0.025 25); /* 5.9:1 on --surface-sunk, 6.0:1 on --accent-subtle */
+
+  --accent: #fe1e34; /* Feuerwehr-Rot: marks, today, progress — never small text */
+  --accent-fill: oklch(0.54 0.215 25); /* buttons; white text 5.7:1 */
+  --accent-fill-hover: oklch(0.48 0.19 25);
+  --accent-ink: oklch(1 0 0); /* text on accent fills */
+  --accent-text: oklch(0.54 0.215 25); /* red text: 5.6:1 on surface, 4.9:1 on subtle */
+  --accent-subtle: oklch(0.955 0.025 22);
+
+  --danger: oklch(0.5 0.16 45); /* burnt orange, reads apart from the brand red */
+  --danger-subtle: oklch(0.96 0.03 50);
+  --success: oklch(0.5 0.12 150); /* 5.0:1 on --success-subtle */
+  --success-subtle: oklch(0.955 0.035 150);
+  --warn: oklch(0.8 0.15 80); /* alert border tint only */
+  --warn-text: oklch(0.43 0.09 70);
+  --warn-subtle: oklch(0.97 0.04 90);
+
+  /* Ampel: colour AND shape (check / dashed / empty circle), each ≥3:1 as a graphic. */
+  --ampel-gruen: var(--success);
+  --ampel-gelb: oklch(0.62 0.14 70); /* 3.7:1 on surface */
+  --ampel-rot: var(--accent); /* 3.8:1 on surface, 4.6:1 dark */
+
+  --scrim: oklch(0.2 0.02 25 / 0.5);
+  --focus: var(--accent);
+
+  /* ---------- Type ---------- */
+  --font-sans: 'Switzer', 'Helvetica Neue', Arial, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --leading-tight: 1.2;
+  --leading: 1.5;
+
+  /* ---------- Space & shape ---------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --touch: 44px; /* minimum touch target */
+  --page-max: 1040px;
+  --shadow-overlay: 0 12px 32px oklch(0.2 0.02 25 / 0.18), 0 2px 6px oklch(0.2 0.02 25 / 0.08);
+
+  /* ---------- Motion ---------- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* exponential ease-out */
+  --dur-fast: 120ms;
+  --dur: 240ms;
+  --dur-slow: 420ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(0.17 0.01 25);
+    --surface: oklch(0.215 0.012 25);
+    --surface-raised: oklch(0.25 0.014 25);
+    --surface-sunk: oklch(0.14 0.01 25);
+    --border: oklch(0.32 0.015 25);
+    --border-strong: oklch(0.42 0.018 25);
+    --ink: oklch(0.94 0.008 25); /* 16:1 on --bg */
+    --muted: oklch(0.72 0.02 25); /* 7.0:1 on --surface, 6.1:1 on --accent-subtle */
+
+    --accent-text: oklch(0.72 0.17 22); /* 6.6:1 on surface */
+    --accent-subtle: oklch(0.27 0.06 22);
+
+    --danger: oklch(0.75 0.14 50);
+    --danger-subtle: oklch(0.26 0.05 45);
+    --success: oklch(0.76 0.14 150);
+    --success-subtle: oklch(0.25 0.045 150);
+    --warn-text: oklch(0.85 0.12 85);
+    --warn-subtle: oklch(0.26 0.04 80);
+    --ampel-gelb: oklch(0.82 0.14 85);
+
+    --scrim: oklch(0.05 0.01 25 / 0.65);
+    --shadow-overlay: 0 12px 32px oklch(0 0 0 / 0.5);
+  }
+}
