@@ -149,6 +149,12 @@ export interface Benutzer {
   truppId: string | null;
   /** APAS-Rolle within the Trupp; always null without a Trupp. */
   rolle: Rolle | null;
+  /**
+   * Truppsuche: the APAS-Rolle this person WANTS to play once grouped into a new Trupp.
+   * Only meaningful without a Trupp — always null while truppId is set (cleared on every
+   * way into a Trupp). Set via PATCH /benutzer/me/gewuenschte-rolle.
+   */
+  gewuenschteRolle: Rolle | null;
   checkliste: Checkliste;
   createdAt: string;
 }
@@ -494,6 +500,46 @@ export interface TruppWahl {
   offeneRollen: Rolle[];
   /** ROLLEN with at least one holder, in ROLLEN order (duplicates are allowed, so still joinable). */
   besetzteRollen: Rolle[];
+}
+
+// ---------------------------------------------------------------------------
+// Truppsuche — Trupp-less Teilnehmer group themselves into a NEW Trupp
+// ---------------------------------------------------------------------------
+
+/** Min/max people (initiator included) in one POST /truppsuche/trupp. */
+export const TRUPPSUCHE_MIN_PERSONEN = 2;
+export const TRUPPSUCHE_MAX_PERSONEN = 6;
+
+/** PATCH /benutzer/me/gewuenschte-rolle — null clears it. Response: MeResponse. */
+export interface GewuenschteRolleUpdate {
+  gewuenschteRolle: Rolle | null;
+}
+
+/** One waiting person in GET /truppsuche. Deliberately no Checkliste, no e-mail. */
+export interface TruppsuchePerson {
+  id: string;
+  name: string;
+  ff: string | null;
+  gewuenschteRolle: Rolle;
+}
+
+/** GET /truppsuche */
+export interface TruppsucheResponse {
+  /** The caller's own Wunschrolle (null = not set, caller is then not listed for others). */
+  eigeneGewuenschteRolle: Rolle | null;
+  /**
+   * OTHER Trupp-less Teilnehmer with a Wunschrolle (caller excluded), sorted by
+   * gewuenschteRolle in ROLLEN order, then name.
+   */
+  personen: TruppsuchePerson[];
+}
+
+/**
+ * POST /truppsuche/trupp — the OTHER people to form a new Trupp with (the caller is added
+ * implicitly). Response 201: MeResponse (caller now in the new Trupp).
+ */
+export interface TruppsucheTruppRequest {
+  benutzerIds: string[];
 }
 
 /** POST /trupps/:inviteToken/join — new account, already a member of that Trupp. */

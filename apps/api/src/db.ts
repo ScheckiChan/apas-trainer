@@ -31,6 +31,11 @@ export interface BenutzerRecord {
   truppId: string | null;
   /** APAS-Rolle inside the Trupp; null whenever truppId is null. */
   rolle: Rolle | null;
+  /**
+   * Truppsuche Wunschrolle; null whenever truppId is set (lib/beitreten.ts inTruppSetzen()
+   * clears it). Backfilled as null by migrateGewuenschteRolle — read with `?? null` anyway.
+   */
+  gewuenschteRolle: Rolle | null;
   checkliste: Checkliste;
   createdAt: string;
   /** When attached to the current Trupp; null without a Trupp. */

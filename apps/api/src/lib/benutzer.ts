@@ -95,6 +95,7 @@ export function newBenutzerRecord(input: {
     ff: input.ff,
     truppId,
     rolle: null,
+    gewuenschteRolle: null,
     checkliste: { ...EMPTY_CHECKLISTE },
     createdAt: now,
     joinedAt: truppId ? now : null,

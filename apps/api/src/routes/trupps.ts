@@ -11,13 +11,14 @@ import {
 } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
-import { db, istMitglied, type MitgliedRecord, type TruppRecord } from '../db.js';
+import { db, istMitglied, type MitgliedRecord } from '../db.js';
 import { isAusbilder, loadTrupp, requireAusbilder, requireAuth, requireRolle } from '../lib/auth.js';
-import { truppBeitreten } from '../lib/beitreten.js';
+import { inTruppSetzen, truppBeitreten } from '../lib/beitreten.js';
 import { emailSchema, emailVergeben, findByEmail, nameSchema, newBenutzerRecord, optionalFfSchema } from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
-import { newId, randomToken } from '../lib/ids.js';
+import { randomToken } from '../lib/ids.js';
 import { generateTempPassword, hashPassword } from '../lib/password.js';
+import { newTruppRecord } from '../lib/trupp.js';
 import { toTrupp, toTeilnehmer, truppIconOf } from '../serialize.js';
 import { meResponse } from './auth.js';
 
@@ -62,16 +63,7 @@ const createSchema = z.object({
 
 truppsRouter.post('/', requireAusbilder, async (req, res) => {
   const input = parseBody(createSchema, req);
-  const rec: TruppRecord = {
-    id: newId(),
-    name: input.name,
-    icon: null,
-    stufe: 'BRONZE',
-    pruefungstermin: input.pruefungstermin ?? null,
-    ownerId: req.benutzer!.id,
-    inviteToken: randomToken(),
-    createdAt: new Date().toISOString(),
-  };
+  const rec = newTruppRecord({ name: input.name, pruefungstermin: input.pruefungstermin ?? null, ownerId: req.benutzer!.id });
   await db.trupps.insert(rec);
   res.status(201).json(toTrupp(rec, { includeInvite: true }));
 });
@@ -263,11 +255,7 @@ truppsRouter.post('/:truppId/teilnehmer/zuordnen', requireAusbilder, async (req,
     if (b.truppId && b.truppId !== trupp.id) {
       throw new HttpError(409, `${b.name} ist bereits in einem anderen Trupp — dort zuerst entfernen.`);
     }
-    if (b.truppId !== trupp.id) {
-      b.truppId = trupp.id;
-      b.rolle = null;
-      b.joinedAt = new Date().toISOString();
-    }
+    if (b.truppId !== trupp.id) inTruppSetzen(b, trupp.id);
     return { items, result: b as MitgliedRecord };
   });
   res.json(toTeilnehmer(rec));

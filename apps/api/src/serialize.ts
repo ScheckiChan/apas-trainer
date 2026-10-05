@@ -52,6 +52,7 @@ export function toBenutzer(b: BenutzerRecord): Benutzer {
     systemRolle: b.systemRolle,
     truppId: b.truppId,
     rolle: b.truppId ? (b.rolle ?? null) : null,
+    gewuenschteRolle: b.truppId ? null : (b.gewuenschteRolle ?? null),
     checkliste: b.checkliste,
     createdAt: b.createdAt,
   };

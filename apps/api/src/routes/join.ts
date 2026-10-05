@@ -68,7 +68,14 @@ joinRouter.post('/:token/join', async (req, res) => {
 
     if (legacy) {
       const { emailVerified: _v, ...rest } = legacy as BenutzerRecord & { emailVerified?: boolean };
-      const claimed: BenutzerRecord = { ...rest, email: input.email, name: input.name, ff: input.ff, passwordHash };
+      const claimed: BenutzerRecord = {
+        ...rest,
+        email: input.email,
+        name: input.name,
+        ff: input.ff,
+        passwordHash,
+        gewuenschteRolle: null,
+      };
       return { items: items.map((b) => (b.id === legacy.id ? claimed : b)), result: claimed };
     }
     const rec = newBenutzerRecord({ email: input.email, name: input.name, ff: input.ff, passwordHash, truppId: trupp.id });

@@ -337,6 +337,44 @@ export function migrateEmail(dataDir: string): void {
   );
 }
 
+/** Kept in sync with ROLLEN in @apas/shared (not imported: migrations stay self-contained). */
+const APAS_ROLLEN = ['GKDT', 'ATF_ATM1', 'ATM2', 'WASSERTRUPPFUEHRER'];
+
+/**
+ * Truppsuche: every account gets `gewuenschteRolle: null` if the field is missing. A value
+ * that is not a known APAS-Rolle, or that is set on an account already in a Trupp (the
+ * field only applies without a Trupp), is reset to null. Nothing else is touched.
+ * Idempotent: once every record has a valid value, nothing is written.
+ */
+export function migrateGewuenschteRolle(dataDir: string): void {
+  const file = path.join(dataDir, 'benutzer.json');
+  if (!existsSync(file)) return;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    console.error(`[migrate] benutzer.json nicht lesbar — gewuenschteRolle-Migration übersprungen: ${(err as Error).message}`);
+    return;
+  }
+  if (!Array.isArray(raw)) return;
+  let changed = 0;
+  for (const b of raw as unknown[]) {
+    if (!b || typeof b !== 'object' || Array.isArray(b)) continue;
+    const rec = b as Record<string, unknown>;
+    const v = rec.gewuenschteRolle;
+    const gueltig =
+      'gewuenschteRolle' in rec &&
+      (v === null || (typeof v === 'string' && APAS_ROLLEN.includes(v) && !rec.truppId));
+    if (!gueltig) {
+      rec.gewuenschteRolle = null;
+      changed++;
+    }
+  }
+  if (changed === 0) return;
+  writeArray(file, raw);
+  console.log(`[migrate] benutzer.json: gewuenschteRolle: null ergänzt/bereinigt (${changed})`);
+}
+
 /** Every migration, in order. Run before the first collection is read (API start, seed script). */
 export function runMigrations(dataDir: string): void {
   if (!existsSync(dataDir)) return;
@@ -346,4 +384,5 @@ export function runMigrations(dataDir: string): void {
   migrateEmail(dataDir);
   migrateTruppIcon(dataDir);
   migrateAnwesend(dataDir);
+  migrateGewuenschteRolle(dataDir);
 }

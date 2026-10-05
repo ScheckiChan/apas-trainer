@@ -9,6 +9,7 @@ import { benutzerRouter } from './routes/benutzer.js';
 import { einstellungenRouter } from './routes/einstellungen.js';
 import { ergebnisseRouter, ranglisteRouter } from './routes/ergebnisse.js';
 import { truppsRouter } from './routes/trupps.js';
+import { eigenesKontoRouter, truppsucheRouter } from './routes/truppsuche.js';
 import { joinRouter } from './routes/join.js';
 import { pushRouter } from './routes/push.js';
 import { teilnehmerRouter } from './routes/teilnehmer.js';
@@ -47,14 +48,19 @@ export function createApp() {
   // Self-service Trupp-Wahl join: authenticated, so budgeted per account instead of per IP —
   // a whole event behind one venue Wi-Fi can register + self-join without starving each
   // other, while a single account still can't hammer it. Runs after requireAuth (below).
-  const selbstBeitrittLimiter = rateLimit({
-    windowMs: 15 * 60_000,
-    limit: 10,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    message: { error: 'Zu viele Versuche — bitte später erneut probieren' },
-    keyGenerator: (req) => `benutzer:${req.benutzer!.id}`,
-  });
+  const proKonto = (prefix: string, limit: number) =>
+    rateLimit({
+      windowMs: 15 * 60_000,
+      limit,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: { error: 'Zu viele Versuche — bitte später erneut probieren' },
+      keyGenerator: (req) => `${prefix}:${req.benutzer!.id}`,
+    });
+  const selbstBeitrittLimiter = proKonto('benutzer', 10);
+  // Truppsuche "Neuen Trupp bilden" creates a Trupp without any Ausbilder — same per-account
+  // budget as the self-join, counted separately.
+  const truppsucheLimiter = proKonto('truppsuche', 10);
 
   app.use('/api', apiLimiter);
   app.get('/api/health', (_req, res) => {
@@ -67,9 +73,13 @@ export function createApp() {
   app.post('/api/trupps/:token/beitreten', accountLimiter);
   // requireAuth first so the limiter can key by account (unauthenticated → 401 here).
   app.post('/api/trupps/waehlbar/:truppId/beitreten', requireAuth, selbstBeitrittLimiter);
+  app.post('/api/truppsuche/trupp', requireAuth, truppsucheLimiter);
 
   app.use('/api/auth', authRouter);
+  // Self-service on the own account — must come before the Ausbilder-only benutzerRouter.
+  app.use('/api/benutzer/me', eigenesKontoRouter);
   app.use('/api/benutzer', benutzerRouter);
+  app.use('/api/truppsuche', truppsucheRouter);
   app.use('/api/einstellungen', einstellungenRouter);
   app.use('/api/termine', termineRouter);
   app.use('/api/ressourcen', ressourcenRouter);
