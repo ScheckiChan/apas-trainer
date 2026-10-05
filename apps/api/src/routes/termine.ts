@@ -5,7 +5,7 @@ import { db, type TerminRecord } from '../db.js';
 import { isAusbilder, requireAuth } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId } from '../lib/ids.js';
-import { forgetReminders } from '../reminders.js';
+import { forgetReminders, notifyNewFixtermin } from '../reminders.js';
 import { toTermin } from '../serialize.js';
 
 /**
@@ -131,6 +131,7 @@ termineRouter.post('/', async (req, res) => {
     start: new Date(input.start).toISOString(),
     ende: new Date(input.ende).toISOString(),
     teilnehmerIds,
+    anwesendIds: [],
     ressourceId: input.ressourceId ?? null,
     createdBy: req.benutzer!.id,
     createdAt: new Date().toISOString(),
@@ -141,6 +142,8 @@ termineRouter.post('/', async (req, res) => {
     konflikte: await findKonflikte(rec.ressourceId, rec.start, rec.ende, rec.id),
   };
   res.status(201).json(body);
+  // Fire-and-forget: push problems must never fail or delay the request.
+  if (rec.typ === 'fix') void notifyNewFixtermin(rec).catch((err) => console.log('[push] notifyNewFixtermin', err));
 });
 
 termineRouter.put('/:terminId', async (req, res) => {
@@ -162,6 +165,8 @@ termineRouter.put('/:terminId', async (req, res) => {
     start: new Date(input.start).toISOString(),
     ende: new Date(input.ende).toISOString(),
     teilnehmerIds,
+    // RSVP only exists on Fixtermine: kept across edits, cleared when it becomes an Individualübung.
+    anwesendIds: input.typ === 'fix' ? (t.anwesendIds ?? []) : [],
     ressourceId: input.ressourceId ?? null,
   }));
   const body: TerminSaveResponse = {
@@ -178,4 +183,38 @@ termineRouter.delete('/:terminId', async (req, res) => {
   await db.termine.remove((t) => t.id === existing.id);
   await forgetReminders(existing.id);
   res.status(204).end();
+});
+
+/**
+ * RSVP ("anwesend") on a Fixtermin. Everyone may (un)register only themselves; an Ausbilder
+ * may (un)register anyone (e.g. someone without the app). Both directions are idempotent and
+ * answer with the updated Termin.
+ */
+async function setAnwesend(req: Request, anwesend: boolean) {
+  const terminId = String(req.params.terminId);
+  const benutzerId = String(req.params.benutzerId);
+  if (benutzerId !== req.benutzer!.id && !isAusbilder(req)) {
+    throw new HttpError(403, 'Du kannst nur dich selbst anmelden oder abmelden');
+  }
+  const existing = await db.termine.get(terminId);
+  if (!existing) throw new HttpError(404, 'Termin nicht gefunden');
+  if (existing.typ !== 'fix') throw new HttpError(400, 'Anmeldung nur für Fixtermine');
+  if (!(await db.benutzer.get(benutzerId))) throw new HttpError(400, 'Unbekannte Person');
+
+  const updated = await db.termine.patch(terminId, (t) => {
+    if (t.typ !== 'fix') throw new HttpError(400, 'Anmeldung nur für Fixtermine');
+    const ids = t.anwesendIds ?? [];
+    if (ids.includes(benutzerId) === anwesend) return { ...t, anwesendIds: ids }; // already in that state
+    return { ...t, anwesendIds: anwesend ? [...ids, benutzerId] : ids.filter((id) => id !== benutzerId) };
+  });
+  if (!updated) throw new HttpError(404, 'Termin nicht gefunden');
+  return toTermin(updated);
+}
+
+termineRouter.put('/:terminId/anwesend/:benutzerId', async (req, res) => {
+  res.json(await setAnwesend(req, true));
+});
+
+termineRouter.delete('/:terminId/anwesend/:benutzerId', async (req, res) => {
+  res.json(await setAnwesend(req, false));
 });

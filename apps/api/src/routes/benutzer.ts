@@ -92,7 +92,13 @@ benutzerRouter.delete('/:benutzerId', async (req, res) => {
   });
   await db.termine.update((items) => ({
     items: items.map((t) =>
-      t.teilnehmerIds.includes(id) ? { ...t, teilnehmerIds: t.teilnehmerIds.filter((x) => x !== id) } : t,
+      t.teilnehmerIds.includes(id) || t.anwesendIds?.includes(id)
+        ? {
+            ...t,
+            teilnehmerIds: t.teilnehmerIds.filter((x) => x !== id),
+            anwesendIds: (t.anwesendIds ?? []).filter((x) => x !== id),
+          }
+        : t,
     ),
     result: undefined,
   }));

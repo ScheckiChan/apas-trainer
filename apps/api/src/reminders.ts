@@ -1,21 +1,14 @@
 import { config } from './config.js';
-import { db, type PushOwner } from './db.js';
+import { db, type PushOwner, type TerminRecord } from './db.js';
+import { formatTerminZeit } from './lib/format.js';
 import { newId } from './lib/ids.js';
 import { isPushEnabled, sendPushTo } from './push.js';
-
-const fmt = new Intl.DateTimeFormat('de-AT', {
-  weekday: 'short',
-  day: '2-digit',
-  month: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: process.env.TZ || 'Europe/Vienna',
-});
 
 /**
  * One tick: finds Termine starting within the next REMINDER_HOURS_BEFORE hours that
  * have not been reminded yet (per terminId + start), pushes to the assigned
- * accounts (of any Trupp) and every Ausbilder, and records the reminder.
+ * accounts (of any Trupp), everyone who confirmed "anwesend" and every Ausbilder, and
+ * records the reminder.
  */
 export async function reminderTick(now = new Date()): Promise<void> {
   const horizon = now.getTime() + config.reminderHoursBefore * 3600_000;
@@ -35,16 +28,44 @@ export async function reminderTick(now = new Date()): Promise<void> {
     // Mark first so a crash mid-send never leads to duplicate reminders.
     await db.reminders.insert({ id: newId(), terminId: t.id, start: t.start, sentAt: new Date().toISOString() });
 
-    const ids = new Set([...t.teilnehmerIds, ...ausbilder.map((a) => a.id)]);
+    const ids = new Set([...t.teilnehmerIds, ...(t.anwesendIds ?? []), ...ausbilder.map((a) => a.id)]);
     const owners = [...ids].map((id): PushOwner => ({ kind: 'benutzer', id }));
     const art = t.typ === 'fix' ? 'Fixtermin' : 'Individualübung';
     const delivered = await sendPushTo(owners, {
       title: `Erinnerung: ${t.titel}`,
-      body: `${art} am ${fmt.format(new Date(t.start))}`,
+      body: `${art} am ${formatTerminZeit(t.start)}`,
       url: '/kalender',
       tag: `termin-${t.id}`,
     });
     console.log(`[reminders] Termin ${t.id} "${t.titel}": ${delivered} Push-Nachricht(en) zugestellt`);
+  }
+}
+
+/**
+ * Immediate push when a Fixtermin is created (not on edits, never for Individualübungen).
+ * Same targeting as reminderTick — assigned teilnehmerIds + every Ausbilder — minus the
+ * creator. Never throws: call fire-and-forget (`void notifyNewFixtermin(rec)`).
+ */
+export async function notifyNewFixtermin(t: TerminRecord): Promise<void> {
+  if (t.typ !== 'fix') return;
+  if (!isPushEnabled()) {
+    console.log(`[push] Neuer Fixtermin ${t.id} "${t.titel}": Push deaktiviert (keine VAPID-Schlüssel), nichts gesendet`);
+    return;
+  }
+  try {
+    const ausbilder = await db.benutzer.find((b) => b.systemRolle === 'ausbilder');
+    const ids = new Set([...t.teilnehmerIds, ...ausbilder.map((a) => a.id)]);
+    ids.delete(t.createdBy);
+    const owners = [...ids].map((id): PushOwner => ({ kind: 'benutzer', id }));
+    const delivered = await sendPushTo(owners, {
+      title: `Neuer Übungstermin: ${t.titel}`,
+      body: formatTerminZeit(t.start),
+      url: '/kalender',
+      tag: `termin-neu-${t.id}`,
+    });
+    console.log(`[push] Neuer Fixtermin ${t.id} "${t.titel}": ${delivered} Push-Nachricht(en) zugestellt`);
+  } catch (err) {
+    console.log(`[push] Neuer Fixtermin ${t.id}: Benachrichtigung fehlgeschlagen — ${(err as Error).message}`);
   }
 }
 

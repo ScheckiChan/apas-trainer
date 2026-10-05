@@ -56,6 +56,11 @@ export interface TerminRecord {
   start: string;
   ende: string;
   teilnehmerIds: string[];
+  /**
+   * Fixtermine only: self-RSVP ("anwesend"), separate from the assigned teilnehmerIds.
+   * Always [] for Individualübungen. Added by migrateAnwesend for older records.
+   */
+  anwesendIds: string[];
   ressourceId: string | null;
   createdBy: string;
   createdAt: string;
