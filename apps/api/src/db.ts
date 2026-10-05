@@ -1,4 +1,14 @@
-import type { Checkliste, Rolle, StationId, Stufe, SystemRolle, TeilErgebnis, TerminTyp, WappenContentType } from '@apas/shared';
+import type {
+  Checkliste,
+  Rolle,
+  StationId,
+  Stufe,
+  SystemRolle,
+  TeilErgebnis,
+  TerminTyp,
+  TruppIcon,
+  WappenContentType,
+} from '@apas/shared';
 import { config } from './config.js';
 import { JsonCollection } from './lib/store.js';
 
@@ -33,6 +43,8 @@ export const istMitglied = (b: BenutzerRecord): b is MitgliedRecord => b.truppId
 export interface TruppRecord {
   id: string;
   name: string;
+  /** Self-chosen mascot icon (null = not chosen). Missing on records older than migrateTruppIcon. */
+  icon?: TruppIcon | null;
   stufe: Stufe;
   pruefungstermin: string | null;
   /** Creating Ausbilder (informational). */

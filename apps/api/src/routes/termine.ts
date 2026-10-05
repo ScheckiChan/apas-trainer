@@ -6,7 +6,7 @@ import { isAusbilder, requireAuth } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId } from '../lib/ids.js';
 import { forgetReminders } from '../reminders.js';
-import { toTermin } from '../serialize.js';
+import { toTermin, truppIconOf } from '../serialize.js';
 
 /**
  * Mounted at /api/termine. One shared calendar for the whole instance (= one Ausbildung):
@@ -91,17 +91,21 @@ termineRouter.get('/', async (req, res) => {
  */
 termineRouter.get('/personen', async (_req, res) => {
   const [benutzer, trupps] = await Promise.all([db.benutzer.all(), db.trupps.all()]);
-  const truppName = new Map(trupps.map((t) => [t.id, t.name]));
+  const truppById = new Map(trupps.map((t) => [t.id, t]));
   const body: KalenderPerson[] = benutzer
-    .map((b) => ({
-      id: b.id,
-      name: b.name,
-      ff: b.ff,
-      systemRolle: b.systemRolle,
-      rolle: b.truppId ? (b.rolle ?? null) : null,
-      truppId: b.truppId,
-      truppName: b.truppId ? (truppName.get(b.truppId) ?? '—') : null,
-    }))
+    .map((b) => {
+      const trupp = b.truppId ? truppById.get(b.truppId) : undefined;
+      return {
+        id: b.id,
+        name: b.name,
+        ff: b.ff,
+        systemRolle: b.systemRolle,
+        rolle: b.truppId ? (b.rolle ?? null) : null,
+        truppId: b.truppId,
+        truppName: b.truppId ? (trupp?.name ?? '—') : null,
+        truppIcon: truppIconOf(trupp),
+      };
+    })
     .sort(
       (a, b) =>
         Number(a.truppName === null) - Number(b.truppName === null) ||

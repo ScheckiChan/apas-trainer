@@ -1,0 +1,135 @@
+/* Trupp "Name & Icon" editor: text field + radio grid of mascot icons. */
+
+.ti-intro {
+  margin: 0;
+}
+
+.ti-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.ti-legend {
+  padding: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.ti-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
+  gap: var(--space-2);
+  max-width: 36rem;
+}
+
+/* One option: a 48px tile around a visually hidden (but focusable) native radio. */
+.ti-opt {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 3rem;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.ti-opt input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ti-opt:hover {
+  background: var(--surface-sunk);
+}
+
+.ti-opt:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ti-opt-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  vertical-align: 0;
+}
+
+.ti-opt-default .ti-opt-icon {
+  color: var(--muted);
+}
+
+/* Selected: thicker accent ring + tint + a check badge — never colour alone. */
+.ti-opt-checked {
+  border-color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px var(--accent-text);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+
+.ti-opt-checked:hover {
+  background: var(--accent-subtle);
+}
+
+.ti-opt-check {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.4rem;
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
+}
+
+.ti-opt-check .icon {
+  vertical-align: 0;
+  stroke-width: 3;
+}
+
+.ti-current {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.ti-current-icon {
+  color: var(--accent-text);
+  vertical-align: 0;
+}
+
+.ti-current-default {
+  color: var(--muted);
+}
+
+.ti-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--success);
+}

@@ -199,10 +199,33 @@ export function migrateBenutzer(dataDir: string): void {
   }
 }
 
+/**
+ * Trupp-Identität: every Trupp gets an explicit `icon: null` ("not chosen yet") if the field
+ * is missing. Purely additive — existing icons and every other field stay untouched.
+ * Idempotent: once every record has the key, nothing is written. (Reads normalise via
+ * truppIconOf() in serialize.ts anyway; this just keeps trupps.json self-describing.)
+ */
+export function migrateTruppIcon(dataDir: string): void {
+  const file = path.join(dataDir, 'trupps.json');
+  if (!existsSync(file)) return;
+  const trupps = readArray(file);
+  let changed = 0;
+  for (const t of trupps) {
+    if (!('icon' in t)) {
+      t.icon = null;
+      changed++;
+    }
+  }
+  if (changed === 0) return;
+  writeArray(file, trupps);
+  console.log(`[migrate] trupps.json: icon: null ergänzt (${changed})`);
+}
+
 /** Every migration, in order. Run before the first collection is read (API start, seed script). */
 export function runMigrations(dataDir: string): void {
   if (!existsSync(dataDir)) return;
   migrateGruppeToTrupp(dataDir);
   migrateSharedCalendar(dataDir);
   migrateBenutzer(dataDir);
+  migrateTruppIcon(dataDir);
 }

@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useSession } from '../lib/session';
 import { Icon } from './Icon';
 import { PushButton } from './PushButton';
+import { TruppName } from './TruppName';
 
 /**
  * Header actions of the home screens: Kalender, Rangliste, Benutzerverwaltung (Ausbilder
@@ -90,7 +91,12 @@ function KontoMenu() {
             <strong>{benutzer.name}</strong>
             <span className="muted">
               {SYSTEM_ROLLE_LABELS[benutzer.systemRolle]}
-              {trupp ? ` · ${trupp.name}` : ''}
+              {trupp && (
+                <>
+                  {' · '}
+                  <TruppName name={trupp.name} icon={trupp.icon} />
+                </>
+              )}
             </span>
           </div>
           <PushButton onDone={() => setOpen(false)} />

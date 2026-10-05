@@ -10,6 +10,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AuthBrand } from '../components/AuthBrand';
 import { Icon } from '../components/Icon';
+import { TruppName } from '../components/TruppName';
 import { HttpError, api, errorMessage, lastInvite, rememberInvite } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { homePath, useSession } from '../lib/session';
@@ -43,7 +44,10 @@ export function Join() {
         <AuthBrand>
           {info ? (
             <p>
-              Einladung in den Trupp <strong>{info.truppName}</strong>
+              Einladung in den Trupp{' '}
+              <strong>
+                <TruppName name={info.truppName} icon={info.truppIcon} />
+              </strong>
               {info.pruefungstermin && <span className="num"> · Prüfung am {formatDate(info.pruefungstermin)}</span>}
             </p>
           ) : (

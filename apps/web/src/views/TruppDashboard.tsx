@@ -1,9 +1,10 @@
-import { ROLLEN, type Trupp, type TruppSummary } from '@apas/shared';
+import { ROLLEN, TRUPP_NAME_MAX, type Trupp, type TruppSummary } from '@apas/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { HauptNav } from '../components/HauptNav';
 import { Icon } from '../components/Icon';
+import { TruppName } from '../components/TruppName';
 import { api, errorMessage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
 import { useMe } from '../lib/session';
@@ -100,7 +101,7 @@ function TruppRow({ trupp: t, to }: { trupp: TruppSummary; to: string }) {
   const rollenKomplett = t.rollenBesetzt === ROLLEN.length;
   return (
     <Link to={to} className="tl-row">
-      <span className="tl-name">{t.name}</span>
+      <TruppName className="tl-name" name={t.name} icon={t.icon} />
       <span className="tl-stats">
         <span className={`tl-cell ${rollenKomplett ? 'tl-ok' : 'tl-warn'}`}>
           <span className="num">
@@ -164,7 +165,7 @@ function CreateTrupp({ onCreated, onCancel }: { onCreated: (t: Trupp) => void; o
           <input
             id="trupp-name"
             required
-            minLength={2}
+            maxLength={TRUPP_NAME_MAX}
             placeholder="z. B. Trupp 1"
             value={name}
             onChange={(e) => setName(e.target.value)}

@@ -131,9 +131,71 @@ export interface Benutzer {
   createdAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Trupp-Identität (self-chosen display name + mascot icon, just for fun)
+// ---------------------------------------------------------------------------
+
+/**
+ * The curated icons a Trupp may pick as its mascot. Lucide icon ids (same set and names as
+ * apps/web Icon.tsx). The API rejects anything else, so a stored icon always renders.
+ * Feuerwehr-flavoured plus a few generic team/mascot symbols; deliberately no skulls,
+ * weapons or other imagery that reads wrong in a rescue-service training context.
+ */
+export const TRUPP_ICONS = [
+  'flame',
+  'fire-extinguisher',
+  'droplets',
+  'siren',
+  'axe',
+  'shield',
+  'zap',
+  'target',
+  'trophy',
+  'crown',
+  'rocket',
+  'mountain',
+  'anchor',
+  'star',
+  'bird',
+  'dog',
+] as const;
+export type TruppIcon = (typeof TRUPP_ICONS)[number];
+
+export const isTruppIcon = (v: unknown): v is TruppIcon =>
+  typeof v === 'string' && (TRUPP_ICONS as readonly string[]).includes(v);
+
+/**
+ * Shown while a Trupp hasn't picked an icon (`Trupp.icon === null`). Intentionally NOT part
+ * of TRUPP_ICONS: the neutral "group of people" icon means "nothing chosen yet" and can't be
+ * picked, so a chosen mascot is always distinguishable from the default.
+ */
+export const DEFAULT_TRUPP_ICON = 'users' as const;
+
+/** Max length of a Trupp name (create, Ausbilder edit and self-service rename alike). */
+export const TRUPP_NAME_MAX = 40;
+
+/** The icon to display for a Trupp: its chosen one, else DEFAULT_TRUPP_ICON. */
+export function truppIconOrDefault(icon: TruppIcon | null | undefined): TruppIcon | typeof DEFAULT_TRUPP_ICON {
+  return icon ?? DEFAULT_TRUPP_ICON;
+}
+
+/**
+ * Who may change a Trupp's name/icon (PATCH /trupps/:id/identitaet): every Ausbilder, and
+ * Teilnehmer who are members of that Trupp. Prüfer and members of other Trupps may not.
+ */
+export function kannTruppIdentitaetBearbeiten(
+  benutzer: { systemRolle: SystemRolle; truppId: string | null },
+  truppId: string,
+): boolean {
+  if (benutzer.systemRolle === 'ausbilder') return true;
+  return benutzer.systemRolle === 'teilnehmer' && benutzer.truppId === truppId;
+}
+
 export interface Trupp {
   id: string;
   name: string;
+  /** Self-chosen mascot icon; null = not chosen yet (render DEFAULT_TRUPP_ICON). */
+  icon: TruppIcon | null;
   stufe: Stufe;
   /** ISO date (YYYY-MM-DD) */
   pruefungstermin?: string | null;
@@ -204,6 +266,8 @@ export interface KalenderPerson {
   rolle: Rolle | null;
   truppId: string | null;
   truppName: string | null;
+  /** The Trupp's chosen icon; null if no Trupp or none chosen yet. */
+  truppIcon: TruppIcon | null;
 }
 
 /** A Ressource booked by a Termin for a time window. */
@@ -299,6 +363,8 @@ export interface ErgebnisInput {
 export interface RanglistenEintrag {
   truppId: string;
   truppName: string;
+  /** null = not chosen yet (render DEFAULT_TRUPP_ICON). */
+  truppIcon: TruppIcon | null;
   /** The Trupp the calling account belongs to (false for every row if it has no Trupp). */
   eigen: boolean;
   /** This Trupp's latest recorded run at the station. */
@@ -320,12 +386,20 @@ export interface StationRangliste {
  * alongside but don't move a Trupp — they only break the order within an equal time.
  */
 export function stationsRanglisten(
-  trupps: readonly { truppId: string; truppName: string; eigen: boolean; ergebnisse: readonly StationErgebnis[] }[],
+  trupps: readonly {
+    truppId: string;
+    truppName: string;
+    truppIcon: TruppIcon | null;
+    eigen: boolean;
+    ergebnisse: readonly StationErgebnis[];
+  }[],
 ): StationRangliste[] {
   return STATION_IDS.map((stationId) => {
     const eintraege = trupps.flatMap((t): RanglistenEintrag[] => {
       const ergebnis = t.ergebnisse.find((e) => e.stationId === stationId);
-      return ergebnis ? [{ truppId: t.truppId, truppName: t.truppName, eigen: t.eigen, ergebnis, rang: 0 }] : [];
+      return ergebnis
+        ? [{ truppId: t.truppId, truppName: t.truppName, truppIcon: t.truppIcon, eigen: t.eigen, ergebnis, rang: 0 }]
+        : [];
     });
     eintraege.sort(
       (a, b) =>
@@ -372,6 +446,7 @@ export interface RegistrierenRequest {
 
 export interface JoinInfo {
   truppName: string;
+  truppIcon: TruppIcon | null;
   pruefungstermin?: string | null;
 }
 
@@ -409,8 +484,17 @@ export interface BenutzerUebersicht {
   name: string;
   ff: string | null;
   systemRolle: SystemRolle;
-  trupp: { id: string; name: string } | null;
+  trupp: { id: string; name: string; icon: TruppIcon | null } | null;
   createdAt: string;
+}
+
+/**
+ * PATCH /trupps/:id/identitaet — self-service name/icon (Ausbilder or a member of that
+ * Trupp). At least one field. `icon: null` resets to "not chosen".
+ */
+export interface TruppIdentitaetUpdate {
+  name?: string;
+  icon?: TruppIcon | null;
 }
 
 /** PATCH /benutzer/:id/systemrolle */

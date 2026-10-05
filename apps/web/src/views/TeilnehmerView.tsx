@@ -2,6 +2,7 @@ import {
   CHECKLIST_LABELS,
   checklistAmpel,
   isChecklistItemRequired,
+  kannTruppIdentitaetBearbeiten,
   type Benutzer,
   type ChecklistItem,
   type MeResponse,
@@ -16,6 +17,8 @@ import { AmpelDot, ChecklistToggles } from '../components/Checklist';
 import { HauptNav } from '../components/HauptNav';
 import { Icon } from '../components/Icon';
 import { RolleSelect, RollenAbdeckung, rolleLabel, saveRolle } from '../components/Rollen';
+import { TruppIdentitaet } from '../components/TruppIdentitaet';
+import { TruppName } from '../components/TruppName';
 import { api, errorMessage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
 import { useMe, useSession } from '../lib/session';
@@ -100,7 +103,9 @@ function TruppHome({ me, benutzer, trupp }: { me: MeResponse; benutzer: Mitglied
     <>
       <section className="tv-head">
         <div>
-          <h1>{trupp.name}</h1>
+          <h1>
+            <TruppName name={trupp.name} icon={trupp.icon} />
+          </h1>
           <p className="tv-meta">
             Servus, {benutzer.name.split(' ')[0]} — {benutzer.ff ? `${benutzer.ff} · ` : ''}
             {rolleLabel(benutzer.rolle)}
@@ -160,7 +165,18 @@ function TruppHome({ me, benutzer, trupp }: { me: MeResponse; benutzer: Mitglied
         </section>
       )}
 
-      {tab === 'trupp' && <TruppTab me={benutzer} onRolleChange={changeRolle} />}
+      {tab === 'trupp' && (
+        <>
+          <TruppTab me={benutzer} onRolleChange={changeRolle} />
+          {kannTruppIdentitaetBearbeiten(benutzer, trupp.id) && (
+            <TruppIdentitaet
+              trupp={trupp}
+              // Header, Konto-Menü and the offline copy all read the session's Trupp.
+              onSaved={(updated) => setMe({ ...me, trupp: { ...trupp, name: updated.name, icon: updated.icon } })}
+            />
+          )}
+        </>
+      )}
 
       {tab === 'stationen' && <Stations basePath="/teilnehmer/stationen" />}
     </>

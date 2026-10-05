@@ -10,7 +10,7 @@
  * - /api/* is never intercepted or cached (auth headers, uploads and the Wappen
  *   image go straight to the network; the Wappen URL carries ?v= for HTTP caching).
  */
-const CACHE = 'apas-trainer-v3';
+const CACHE = 'apas-trainer-v4';
 
 const SHELL = [
   '/',

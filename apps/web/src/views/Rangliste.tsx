@@ -11,6 +11,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { Icon } from '../components/Icon';
 import { BestandenBadge } from '../components/StationLauf';
+import { TruppName } from '../components/TruppName';
 import { stationById } from '../content/stations';
 import { api, errorMessage } from '../lib/api';
 import { formatDateTime, formatStoppuhr, formatTime } from '../lib/format';
@@ -136,7 +137,7 @@ function RanglistenZeile({ stationId, row: r }: { stationId: StationId; row: Ran
       </span>
       <span className="rl-main">
         <span className="rl-name">
-          {r.truppName}
+          <TruppName name={r.truppName} icon={r.truppIcon} />
           {r.eigen && <span className="badge badge-accent">euer Trupp</span>}
         </span>
         <span className="rl-status">

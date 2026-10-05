@@ -15,6 +15,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { EinmalPasswort } from '../components/EinmalPasswort';
 import { Icon } from '../components/Icon';
+import { TruppName } from '../components/TruppName';
 import { api, apiUrl, errorMessage } from '../lib/api';
 import { useEinstellungen } from '../lib/einstellungen';
 import { homePath, useMe, useSession } from '../lib/session';
@@ -242,7 +243,9 @@ function KontoZeile({
         <span className={`bv-ff ${k.ff ? '' : 'bv-leerwert'}`}>{k.ff ?? '—'}</span>
         <span className="bv-trupp">
           {k.trupp ? (
-            <Link to={`/trupps/${k.trupp.id}`}>{k.trupp.name}</Link>
+            <Link to={`/trupps/${k.trupp.id}`}>
+              <TruppName name={k.trupp.name} icon={k.trupp.icon} />
+            </Link>
           ) : (
             <span className="bv-leerwert">ohne Trupp</span>
           )}

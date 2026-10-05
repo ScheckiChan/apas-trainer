@@ -1,4 +1,13 @@
-import { checklistAmpel, ROLLEN, rollenBesetzung, type TruppSummary, type TeilnehmerCreateResponse } from '@apas/shared';
+import {
+  checklistAmpel,
+  kannTruppIdentitaetBearbeiten,
+  ROLLEN,
+  rollenBesetzung,
+  TRUPP_ICONS,
+  TRUPP_NAME_MAX,
+  type TruppSummary,
+  type TeilnehmerCreateResponse,
+} from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { db, istMitglied, type MitgliedRecord, type TruppRecord } from '../db.js';
@@ -12,6 +21,12 @@ import { toTrupp, toTeilnehmer } from '../serialize.js';
 export const truppsRouter = Router();
 
 const isoDate = z.iso.date();
+
+/** Trupp names: free text (playful names welcome), trimmed, inner whitespace collapsed. */
+const truppNameSchema = z
+  .string()
+  .transform((s) => s.trim().replace(/\s+/g, ' '))
+  .pipe(z.string().min(1).max(TRUPP_NAME_MAX));
 
 // ---------------------------------------------------------------- Trupps
 
@@ -38,7 +53,7 @@ truppsRouter.get('/', requireAuth, requireRolle('ausbilder', 'pruefer'), async (
 });
 
 const createSchema = z.object({
-  name: z.string().trim().min(2).max(100),
+  name: truppNameSchema,
   pruefungstermin: isoDate.nullish(),
 });
 
@@ -47,6 +62,7 @@ truppsRouter.post('/', requireAusbilder, async (req, res) => {
   const rec: TruppRecord = {
     id: newId(),
     name: input.name,
+    icon: null,
     stufe: 'BRONZE',
     pruefungstermin: input.pruefungstermin ?? null,
     ownerId: req.benutzer!.id,
@@ -63,7 +79,7 @@ truppsRouter.get('/:truppId', requireAuth, async (req, res) => {
 });
 
 const patchSchema = z.object({
-  name: z.string().trim().min(2).max(100).optional(),
+  name: truppNameSchema.optional(),
   pruefungstermin: isoDate.nullable().optional(),
 });
 
@@ -76,6 +92,35 @@ truppsRouter.patch('/:truppId', requireAusbilder, async (req, res) => {
     ...(input.pruefungstermin !== undefined ? { pruefungstermin: input.pruefungstermin } : {}),
   }));
   res.json(toTrupp(updated!, { includeInvite: true }));
+});
+
+const identitaetSchema = z
+  .object({
+    name: truppNameSchema.optional(),
+    /** null = back to "not chosen" (default icon). */
+    icon: z.enum(TRUPP_ICONS).nullable().optional(),
+  })
+  .strict()
+  .refine((x) => x.name !== undefined || x.icon !== undefined, { message: 'Name oder Icon angeben' });
+
+/**
+ * Self-service Trupp-Identität (name + mascot icon), just for fun: any Ausbilder, or a
+ * Teilnehmer who is a member of this Trupp. Prüfer and members of other Trupps get 403
+ * (checked before the lookup, so it doesn't reveal whether the Trupp id exists).
+ * Ausbilder-only fields (pruefungstermin, invite) stay on PATCH /:truppId.
+ */
+truppsRouter.patch('/:truppId/identitaet', requireAuth, async (req, res) => {
+  if (!kannTruppIdentitaetBearbeiten(req.benutzer!, String(req.params.truppId))) {
+    throw new HttpError(403, 'Nur Mitglieder dieses Trupps oder Ausbilder können Name und Icon ändern');
+  }
+  const trupp = await loadTrupp(req, 'trupp');
+  const input = parseBody(identitaetSchema, req);
+  const updated = await db.trupps.patch(trupp.id, (x) => ({
+    ...x,
+    ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.icon !== undefined ? { icon: input.icon } : {}),
+  }));
+  res.json(toTrupp(updated!, { includeInvite: isAusbilder(req) }));
 });
 
 truppsRouter.post('/:truppId/invite/regenerate', requireAusbilder, async (req, res) => {
