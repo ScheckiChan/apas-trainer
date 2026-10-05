@@ -159,7 +159,7 @@ repo root as build context.
 
 **Backups:** everything lives in the `DATA_DIR` JSON files
 (`ausbildungsleiter.json`, `trupps.json`, `teilnehmer.json`, `ressourcen.json`,
-`termine.json`, `pushsubscriptions.json`, `reminders.json`). A leftover `magiclinks.json`
+`termine.json`, `ergebnisse.json`, `pushsubscriptions.json`, `reminders.json`). A leftover `magiclinks.json`
 from before the password switch is no longer read and can be deleted.
 Copying the volume is a complete backup.
 
@@ -186,6 +186,9 @@ All endpoints are under `/api`. Auth is `Authorization: Bearer <jwt>`.
 | `GET /trupps/:id/ressourcen` · `POST` · `DELETE /:rid`     | member (read) / owner (write) |
 | `GET /trupps/:id/termine?from&to` · `POST` · `PUT/DELETE /:terminId` | member / owner                |
 | `POST /trupps/:id/termine/konflikte`                       | member / owner                |
+| `GET /trupps/:id/ergebnisse`                               | member / owner                |
+| `PUT /trupps/:id/ergebnisse/:stationId` {zeitSekunden, fehlerpunkte, teile?} | owner                         |
+| `GET /rangliste`                                           | any signed-in user            |
 | `GET /push/vapid-public-key` · `POST /push/subscribe` · `POST /push/unsubscribe` | public / any                  |
 | `GET /health`                                              | public                        |
 
@@ -272,6 +275,63 @@ Things SPEC.md left open and how they were resolved:
   `pointer: coarse`). Motion is the existing step slide and card flip, shortened to
   exponential ease-out tokens. `prefers-reduced-motion` turns them off, plus a global
   transition clamp.
+
+**Stoppuhr, Ergebnisse & Rangliste**
+- The station page is built to be operated live, one-handed, while a Trupp runs the
+  station. Order: Soll-Zeit, Stoppuhr, Fehlerpunkte of this run, then Ablauf and
+  Lernkarten. Once anything is on the clock or ticked, a bar pinned to the bottom keeps
+  the clock (with Start/Pause), the running total and pass/fail in view. While a clock
+  runs the page holds a screen wake lock. Time is always derived from `Date.now()`, so a
+  locked phone or background tab never loses seconds.
+- **Stoppuhr per Teil.** Most stations have one; Station 4 has two (Geräteversorgung
+  500 Sek., Fragen 300 Sek.), because the Bestimmungen time and score them separately.
+  Where a station has variants (Ausrüsten: im Fahrzeug / außerhalb × 200 / 300 bar), a
+  selector picks the Soll-Zeit before starting (locked while running). The
+  "Elektronisches Manometer" variant has no fixed time, so it takes a Soll-Zeit typed in
+  by hand.
+- **Zeitüberschreitung** follows the content rule "2 Punkte je 10 Sek." with every
+  *started* 10-second block counting: 1–10 s over → +2, 11–20 s → +4, 23 s → +6. The
+  spec's example ("23 Sek → +4") contradicts its own "round up" rule; the rule won.
+  Whole seconds are compared, so exactly on the Soll-Zeit is no overrun. Past the
+  Soll-Zeit the clock turns amber (informational, no flashing, no red).
+- **The Fehlerpunkte checklist now records what happened** instead of the earlier
+  "vermieden" self-study ticks: one-off rows are checkboxes, "je Mitglied" / "je Fall"
+  rows are counters (0–9, points × count), and the Zeitüberschreitung row is filled in
+  by the Stoppuhr and can't be ticked by hand. The Gesamt-Fehlerpunkte (checklist +
+  time) are shown against the station's own limit as "bestanden / nicht bestanden" for
+  this station in isolation; Station 4 passes only if both Teile are within 5 and 6.
+- Practising needs no account action: anyone (Teilnehmer, Leiter, or the public
+  `/stationen` pages) can use the clock and checklist locally; nothing is stored.
+  **"Ergebnis speichern"** appears only for the Ausbildungsleiter on the Trupp-scoped
+  route `/trupps/:id/stationen/:stationId`, i.e. when it's clear which Trupp ran. Saving
+  stops the clocks so the stored time is what is on screen, and the confirmation links
+  to the Rangliste.
+- **Storage: latest result only.** `ergebnisse.json` holds at most one record per
+  (Trupp, Station), id `truppId:stationId`; saving again overwrites it. It's a live
+  tool, not an archive. The record has `zeitSekunden`, `fehlerpunkte`, `teile` (per-Teil
+  time and points, required in the request for Station 4 and checked to add up),
+  `bestanden` and `aufgenommenAm`. The server computes `bestanden` from the limits in
+  `STATION_WERTUNG` (`packages/shared`), which the web content tables also read, so
+  the limits live in one place. The server trusts the submitted points; it can't know
+  which errors were observed.
+- **Rangliste** (`/rangliste`, header trophy icon for both roles, plus a button in
+  Trupp-Details) lists **every Trupp of the deployment** (one Ausbildung per
+  deployment), for any signed-in Ausbildungsleiter or Teilnehmer. Ranking
+  (`rangliste()` in shared):
+  1. Trupps with all 4 stations recorded come first. Among them, those who pass the
+     Bestehensregel (total ≤ 35 **and** no station over its own limit) rank above those
+     who don't, and within each group fewer total Fehlerpunkte rank higher. Equal
+     points share a rank (1, 1, 3).
+  2. Incomplete Trupps follow **without a rank** ("2/4 Stationen absolviert"), sorted
+     by stations done, then points. A Trupp that already broke a limit is flagged
+     "Limit bereits überschritten".
+  Each row shows rank, status, total, and one chip per station (number, points, pass /
+  fail / open icon). It expands to a per-station table (time, points per Teil,
+  result, when recorded). The page refreshes itself every 30 s while visible.
+  A Teilnehmer's own Trupp is marked "euer Trupp". An Ausbildungsleiter usually owns
+  every Trupp, so the marker is not shown for them.
+- There is no delete for a result (re-saving replaces it) and no history. Removing a
+  Trupp isn't supported anywhere yet, so orphaned results can't occur.
 
 **Reference project**
 - The FWMS repository the spec refers to (Dockerfile structure, `push.ts`) was not
@@ -438,10 +498,9 @@ Things SPEC.md left open and how they were resolved:
   the one for your device applies. Gold-only parts and the "außerhalb des Fahrzeuges"
   variant are shown as info cards below the walk-through, not as steps, since v1 is
   Bronze.
-- Checkliste: every Fehlerpunkte table row is a checkable "vermieden" item with its
-  points ("2 Punkte je Mitglied"). Rows worth 10+ points are highlighted. The check
-  state is component-local and is reset by leaving the page; it's a self-study aid,
-  not a record. Station 4 shows both of its tables (Geräteversorgung, Fragen).
+- Fehlerpunkte: every table row is scored for the current run (see **Stoppuhr,
+  Ergebnisse & Rangliste**). Rows worth 10+ points are highlighted. Station 4 shows
+  both of its tables (Geräteversorgung, Fragen).
 - Station 4 has flashcards for all 36 questions: tap to flip (CSS 3D), Vorherige/
   Nächste (wrapping), and Mischen / Originalreihenfolge. Questions 32 and 35 only point
   to the station procedure in the Fragenkatalog, so their cards show those steps
