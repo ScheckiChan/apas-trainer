@@ -6,7 +6,8 @@ deployed once per Ausbildung; the training consists of one or more **Trupps** (4
 Atemschutztrupps with the roles GKDT, ATF/ATM1, ATM2 and Wassertruppführer).
 
 - Everyone has **one account** (E-Mail-Adresse + Passwort to sign in, plus a display
-  name) and signs in on the same login. Accounts come from self-registration (`/registrieren`), a Trupp's invite link, or
+  name) and signs in on the same login. Accounts come from self-registration (`/registrieren`,
+  the one instance-wide invite link; the person then picks their Trupp), a Trupp's invite link, or
   an Ausbilder's "Person hinzufügen". Each account has a **systemRolle**:
   - **Ausbilder** create the Trupps, add people (new or already registered) or share a
     Trupp's invite link / QR code, assign the APAS-Rollen, track every checklist (Ampel),
@@ -64,8 +65,8 @@ npm run seed-admin   # create the first Ausbilder (see "First run")
 npm run dev          # API on :3001, web on http://localhost:5173 (proxies /api)
 ```
 
-- To try the Teilnehmer side, register at `/registrieren` in a private window (or open a
-  Trupp's invite link from TruppDetail and use "Neu beitreten"). Coming back later is the
+- To try the Teilnehmer side, register at `/registrieren` in a private window and pick a
+  Trupp on `/trupp-waehlen` (or open a Trupp's invite link from TruppDetail and use "Neu beitreten"). Coming back later is the
   normal login with e-mail address + password.
 - The service worker is only registered in production builds, so it never
   interferes with Vite's dev server. Use `npm run build && npm run preview -w @apas/web`
@@ -192,11 +193,13 @@ systemRolle, read from storage on every request. Types are in `packages/shared`.
 | Method & path                                                    | Auth                                   |
 | ---------------------------------------------------------------- | -------------------------------------- |
 | `POST /auth/login` {email, password} → `AuthSession`             | public (rate-limited)                  |
-| `POST /auth/registrieren` {email, name, password, ff?} → `AuthSession` | public (rate-limited); new Teilnehmer without Trupp; `409` for a taken e-mail |
+| `POST /auth/registrieren` {email, name, password, ff} → `AuthSession` | public (rate-limited); new Teilnehmer without Trupp; FF required; `409` for a taken e-mail |
 | `GET  /auth/me` → `MeResponse`                                   | signed in                              |
 | `GET /trupps/:inviteToken/join` (Trupp name + date)              | public                                 |
 | `POST /trupps/:inviteToken/join` {email, name, ff, password} → `AuthSession` | public (rate-limited); new account in that Trupp; `409` for a taken e-mail |
 | `POST /trupps/:inviteToken/beitreten` → `MeResponse`             | signed in, account without Trupp (rate-limited) |
+| `GET /trupps/waehlbar` → `TruppWahl[]` (id, name, icon, date, member count, open/taken Rollen) | signed in |
+| `POST /trupps/waehlbar/:truppId/beitreten` → `MeResponse`        | signed in, systemRolle Teilnehmer without Trupp (rate-limited); `409` if already in another Trupp, `403` for Ausbilder/Prüfer |
 | `GET /trupps` → `TruppSummary[]`                                 | Ausbilder (with invite) · Prüfer (without) |
 | `POST /trupps` · `PATCH /trupps/:id` · `POST /trupps/:id/invite/regenerate` | Ausbilder                   |
 | `DELETE /trupps/:id` (members kept, detached to "Ohne Trupp"; its Ergebnisse removed) | Ausbilder     |
@@ -421,8 +424,25 @@ Things SPEC.md left open and how they were resolved:
     Individualübungen. Other Trupps answer `404`, as before.
   - Everyone signed in: Kalender (read, Individualübungen), Ressourcen (read), Rangliste,
     Stationen.
-- **Registration**: `/registrieren` (`POST /auth/registrieren`, e-mail + name + password,
-  FF optional) creates a `teilnehmer` without a Trupp and signs in right away. Every new
+- **Two invite paths coexist**:
+  - **Instance-wide link** — `/registrieren` itself. One link for the whole Ausbildung; an
+    Ausbilder copies it (or shows its QR code) from the "Teilnehmer einladen" card at the
+    bottom of the Trupp dashboard. After registering, the new Teilnehmer lands on
+    `/trupp-waehlen`: every Trupp as a card with member count and open/taken APAS-Rollen,
+    and "Beitreten" joins by Trupp id (`POST /trupps/waehlbar/:truppId/beitreten`, no
+    token) and opens the "Trupp" tab of `/teilnehmer`, where the person picks their Rolle
+    (TruppDetail `/trupps/:id` stays Ausbilder-only). The "Noch in keinem Trupp" card on
+    `/teilnehmer` points there too ("Trupp wählen"). Duplicate Rollen are
+    allowed, so a Trupp with no open Rolle is still joinable. Self-join is only for
+    systemRolle `teilnehmer` without a Trupp; an account already in another Trupp gets a
+    `409` (an Ausbilder moves it), joining the same Trupp again is a no-op.
+  - **Per-Trupp link** — `/join/:inviteToken` from TruppDetail, unchanged: registers
+    ("Neu beitreten") or attaches a signed-in account directly to that one Trupp.
+  Both join endpoints share one implementation (`lib/beitreten.ts`). The self-join lives
+  under `/trupps/waehlbar/…` rather than `/trupps/:truppId/beitreten` because the latter has
+  the same shape as the token route `/trupps/:token/beitreten` and would be ambiguous.
+- **Registration**: `/registrieren` (`POST /auth/registrieren`, e-mail + name + password +
+  FF, FF required since it's a cross-FF event) creates a `teilnehmer` without a Trupp and signs in right away. Every new
   account starts as `teilnehmer`, also via invite link or Person hinzufügen; only
   `seed-admin` and the Benutzerverwaltung make Ausbilder or Prüfer.
 - **Invite link and registration are unified**: both create the same account type. The
@@ -503,9 +523,12 @@ Things SPEC.md left open and how they were resolved:
   id, Rolle, checklist and Termine).
 - Rate limits: 300 req/min per IP on the whole API. Login allows 20 **failed** attempts
   per 15 min per IP (successful logins don't count, so a whole Trupp behind one NAT can
-  still sign in). Registration, invite-link join and "beitreten" share a budget of 30
-  attempts per 15 min per IP, and every attempt counts because they create or change
-  accounts.
+  still sign in). Registration, invite-link join (`/trupps/:token/join`) and the invite-link
+  "beitreten" (`/trupps/:token/beitreten`) share a budget of 30 attempts per 15 min per IP,
+  and every attempt counts because they create or change accounts. The self-service join
+  (`/trupps/waehlbar/:truppId/beitreten`) requires login and has its own budget of 10
+  attempts per 15 min **per account** (not per IP), so a whole event on one venue Wi-Fi can
+  register and pick Trupps without exhausting a shared limit.
 
 **Migration to unified accounts** (`migrateBenutzer` in `src/migrate.ts`)
 - Runs at API start (after the Gruppe→Trupp and shared-calendar steps) and at the start
