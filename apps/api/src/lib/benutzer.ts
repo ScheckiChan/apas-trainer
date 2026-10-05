@@ -21,7 +21,7 @@ export const placeholderEmail = (id: string): string => `${id}@${PLACEHOLDER_EMA
 
 /** User-supplied e-mail (registration, join, Ausbilder add/edit, seed script). Output is emailKey()-normalised. */
 export const emailSchema = z
-  .string()
+  .string({ error: 'Bitte eine E-Mail-Adresse angeben' })
   .trim()
   .toLowerCase()
   .max(254, 'E-Mail-Adresse ist zu lang')

@@ -163,6 +163,8 @@ export function migrateBenutzer(dataDir: string): void {
         id: t.id,
         name: uniqueName(cleanName(t.name, `Teilnehmer ${String(t.id).slice(0, 8)}`), truppId ? (truppName.get(truppId) ?? 'Trupp') : null),
         ...(typeof t.passwordHash === 'string' ? { passwordHash: t.passwordHash } : {}),
+        // Magic-link era address, if any — migrateEmail validates and keeps it.
+        ...(typeof t.email === 'string' ? { email: t.email } : {}),
         systemRolle: 'teilnehmer',
         ff: typeof t.ff === 'string' && t.ff.trim() ? t.ff : null,
         truppId,
