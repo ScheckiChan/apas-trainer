@@ -177,6 +177,7 @@ All endpoints are under `/api`. Auth is `Authorization: Bearer <jwt>`.
 | `GET /gruppen/:id` · `PATCH /gruppen/:id`                  | member / owner                |
 | `POST /gruppen/:id/invite/regenerate`                      | owner                         |
 | `GET /gruppen/:id/teilnehmer`                              | member / owner                |
+| `POST /gruppen/:id/teilnehmer` {name, ff} → {teilnehmer, tempPassword} | owner           |
 | `PATCH /gruppen/:id/teilnehmer/:tid/checkliste`            | owner or that Teilnehmer      |
 | `DELETE /gruppen/:id/teilnehmer/:tid`                      | owner                         |
 | `GET /gruppen/:id/ressourcen` · `POST` · `DELETE /:rid`    | member (read) / owner (write) |
@@ -232,6 +233,18 @@ Things SPEC.md left open and how they were resolved:
   Teilnehmer need the new link to log in again (existing sessions keep working).
   The browser remembers the last used invite link, and the Login page offers a
   shortcut back to it.
+- **Manual add by the Ausbildungsleiter** (GroupDetail → "+ Person hinzufügen", Name +
+  FF), e.g. to pre-populate a Trupp before the first Übung. This is a second path next
+  to the invite link, which stays the normal way in. `POST /gruppen/:id/teilnehmer`
+  creates the record exactly like a self-join (bcrypt, `rolle: null`, same name
+  normalisation, same `409` shape for a taken name) with a generated password: 11
+  characters from an alphabet without look-alikes (no 0/O/o, 1/l/I), about 64 bit. The
+  plaintext is returned once in the response, shown once in a dismissable box with a
+  copy button, and never stored or logged. The person logs in on the invite link under
+  "Anmelden" with name + that password.
+- The generated password stays valid; there is no "change password" flow (out of scope,
+  same as reset). If it gets lost before being passed on, remove the person and add
+  them again, which takes seconds while they have no data yet.
 - There is no password reset for Teilnehmer. If someone forgets theirs, the
   Ausbildungsleiter removes them in GroupDetail and they join again. This loses their
   checklist ticks and Termin assignments, which is acceptable at this scale.
@@ -328,7 +341,33 @@ Things SPEC.md left open and how they were resolved:
 **Content**
 - UI language is German (Austrian conventions: "Servus", Monday-first weeks). Code and
   comments are English.
-- Stations.tsx is deliberately brief and conservative: a general Ablauf summary and
-  focus points per station, the Fehlerpunkte-Grundregel (max. 35 in total, per-station
-  limit, repeat after 14 days at the earliest), and the source cited as plain text.
-  It has no per-station point limits or procedural details beyond that.
+- The station overview (`Stations.tsx`) stays short: a summary and focus points per
+  station, the Bestehensregel (max. 35 in total, per-station limits 20/10/10/5+6,
+  repeat after 14 days at the earliest), and the source. Each card opens a **station
+  deep-dive** (`StationDetail.tsx`) at `<overview>/:stationId`. It's mounted at
+  `/stationen`, `/gruppen/:id/stationen` (Leiter) and `/teilnehmer/stationen`
+  (Teilnehmer; that overview is the "Stationen" tab, now addressable as
+  `/teilnehmer?tab=stationen`).
+- All deep-dive content lives in `apps/web/src/content/stations.ts`, structured from
+  the NÖ LFV Bestimmungen APAS (12/2015), Abschnitte 9.2–9.5, Fragenkatalog and Beilage
+  Hindernisstrecke, keeping their wording. It includes the Ablauf steps, Zeitvorgaben,
+  Fehlerpunkte tables and the 36 Gerätekunde questions. Edit it there with the PDF at
+  hand; the reference extract it came from was removed from the repo after import.
+- Detail page: Zeitvorgabe chips at the top ("Soll: 170 Sek." + mm:ss), then the Ablauf
+  as a guided step-through. One active step slides in with a CSS keyframe animation,
+  Weiter/Zurück or swipe moves between steps, a progress bar shows "Schritt x von y",
+  and the full numbered list below lets you jump. This is the "animation". No
+  libraries, and `prefers-reduced-motion` is honoured.
+- Where the Bestimmungen list alternatives (Kurzprüfung 200 vs. 300 bar, Flaschenwechsel
+  200 vs. 300 bar), both are separate steps in the walk-through, with a note that only
+  the one for your device applies. Gold-only parts and the "außerhalb des Fahrzeuges"
+  variant are shown as info cards below the walk-through, not as steps, since v1 is
+  Bronze.
+- Checkliste: every Fehlerpunkte table row is a checkable "vermieden" item with its
+  points ("2 Punkte je Mitglied"). Rows worth 10+ points are highlighted. The check
+  state is component-local and is reset by leaving the page; it's a self-study aid,
+  not a record. Station 4 shows both of its tables (Geräteversorgung, Fragen).
+- Station 4 has flashcards for all 36 questions: tap to flip (CSS 3D), Vorherige/
+  Nächste (wrapping), and Mischen / Originalreihenfolge. Questions 32 and 35 only point
+  to the station procedure in the Fragenkatalog, so their cards show those steps
+  (Kurzprüfung 200 bar; Flaschenwechsel + Hochdruckdichtprüfung) inline.
