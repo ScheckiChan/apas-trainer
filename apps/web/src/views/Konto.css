@@ -1,0 +1,83 @@
+/* /konto — Mein Konto (views/Konto.tsx). */
+
+.konto {
+  max-width: 44rem;
+}
+
+/* 7 weekday chips: 4 + 3 on a phone, one row of 7 from ~480px. Never scrolls sideways. */
+.konto-tage {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  max-width: 34rem;
+}
+
+@media (min-width: 30rem) {
+  .konto-tage {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+/* Selected = accent tint + filled check; unselected = neutral outline + empty circle. */
+.konto-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: var(--touch);
+  min-height: 3.75rem;
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.konto-tag:hover {
+  background: var(--surface-sunk);
+}
+
+.konto-tag-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--muted);
+}
+
+.konto-tag-label {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.konto-tag-an,
+.konto-tag-an:hover {
+  background: var(--accent-subtle);
+  border-color: color-mix(in oklch, var(--accent) 45%, transparent);
+}
+
+.konto-tag-an .konto-tag-icon,
+.konto-tag-an .konto-tag-label {
+  color: var(--accent-text);
+}
+
+.konto-tage-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.konto-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--success);
+  font-weight: 500;
+}

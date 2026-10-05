@@ -1,6 +1,6 @@
 import { SYSTEM_ROLLE_LABELS } from '@apas/shared';
 import { useEffect, useId, useRef, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useSession } from '../lib/session';
 import { Icon } from './Icon';
 import { PushButton } from './PushButton';
@@ -8,7 +8,7 @@ import { TruppName } from './TruppName';
 
 /**
  * Header actions of the home screens: Kalender, Rangliste, Benutzerverwaltung (Ausbilder
- * only) and the Konto menu (who is signed in, Erinnerungen, Abmelden). Visibility is decided
+ * only) and the Konto menu (who is signed in, Mein Konto, Erinnerungen, Abmelden). Visibility is decided
  * by the account's systemRolle from /auth/me.
  */
 export function HauptNav() {
@@ -111,6 +111,10 @@ function KontoMenu() {
               )}
             </span>
           </div>
+          <Link to="/konto" className="btn btn-ghost" onClick={() => setOpen(false)}>
+            <Icon name="settings" />
+            Mein Konto
+          </Link>
           <PushButton onDone={() => setOpen(false)} />
           <button type="button" className="btn btn-ghost" onClick={logout}>
             <Icon name="log-out" />

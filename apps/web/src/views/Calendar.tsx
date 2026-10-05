@@ -1,5 +1,9 @@
 import {
   SYSTEM_ROLLE_LABELS,
+  WOCHENTAG_KURZ,
+  WOCHENTAG_LABELS,
+  WOCHENTAGE,
+  wochentagVon,
   type BuchungsKonflikt,
   type KalenderPerson,
   type Ressource,
@@ -8,6 +12,7 @@ import {
   type TerminSaveResponse,
   type TerminTyp,
   type TruppIcon,
+  type Wochentag,
 } from '@apas/shared';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AppHeader } from '../components/AppHeader';
@@ -31,7 +36,7 @@ type EditorState =
   | { mode: 'edit'; termin: Termin }
   | null;
 
-const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const WEEKDAYS = WOCHENTAGE.map((t) => WOCHENTAG_KURZ[t]);
 
 /** Fixtermin vs. Individualübung: icon + fill style + label, never colour alone. */
 function TypIcon({ typ }: { typ: TerminTyp }) {
@@ -72,6 +77,26 @@ function personDetail(p: KalenderPerson): string {
   const rolle =
     p.systemRolle !== 'teilnehmer' ? SYSTEM_ROLLE_LABELS[p.systemRolle] : p.truppId ? rolleShort(p.rolle) : null;
   return [rolle, p.ff].filter(Boolean).join(' · ');
+}
+
+/**
+ * Picker hint: the Termin's weekday is not among the person's self-reported preferred days.
+ * Never shown for an empty preference ("keine Angabe") — informational only, never blocks.
+ */
+function PraeferenzHinweis({ person, tag }: { person: KalenderPerson; tag: Wochentag | null }) {
+  const tage = person.trainingspraeferenz ?? [];
+  if (!tag || tage.length === 0 || tage.includes(tag)) return null;
+  const bevorzugt = tage.map((t) => WOCHENTAG_KURZ[t]).join(', ');
+  return (
+    <span className="cal-tn-pref" title={`Bevorzugte Tage: ${bevorzugt}`}>
+      <Icon name="calendar-x" size="1em" />
+      <span>
+        <span className="sr-only">{WOCHENTAG_LABELS[tag]}: </span>
+        bevorzugt nicht
+        <span className="sr-only"> (bevorzugt: {bevorzugt})</span>
+      </span>
+    </span>
+  );
 }
 
 /** "5 angemeldet" — self-RSVP count, Fixtermine only (null for Individualübungen). */
@@ -408,6 +433,9 @@ function TerminEditor({
     });
 
   const gruppen = byTrupp(personen);
+  // Weekday of the date in the form (local time) — drives the Trainingspräferenz hint.
+  const terminDatum = date ? new Date(`${date}T00:00`) : null;
+  const terminTag = terminDatum && !Number.isNaN(terminDatum.getTime()) ? wochentagVon(terminDatum) : null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -600,6 +628,7 @@ function TerminEditor({
                                 <TruppName name={t.truppName} icon={t.truppIcon} />)
                               </span>
                             )}
+                            {canEdit && <PraeferenzHinweis person={t} tag={terminTag} />}
                           </span>
                           <span className="muted">{personDetail(t)}</span>
                         </label>
