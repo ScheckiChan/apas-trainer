@@ -66,7 +66,9 @@ export function Registrieren() {
                 {error}
                 {nameTaken && (
                   <div>
-                    <Link to="/login">Zur Anmeldung</Link>
+                    <Link to="/login" className="btn btn-secondary btn-small auth-switch">
+                      Zur Anmeldung
+                    </Link>
                   </div>
                 )}
               </div>

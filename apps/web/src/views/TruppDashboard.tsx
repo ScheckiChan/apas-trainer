@@ -87,7 +87,8 @@ export function TruppDashboard() {
                 Neuen Trupp erstellen
               </button>
             </div>
-          ))}      </main>
+          ))}
+      </main>
     </>
   );
 }

@@ -115,6 +115,12 @@ h2 + .bv-intro {
   color: var(--muted);
 }
 
+.bv-trupp a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+}
+
 .bv-actions {
   display: flex;
   gap: var(--space-1);
