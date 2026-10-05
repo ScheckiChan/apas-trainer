@@ -119,6 +119,28 @@ export function setAnwesend(terminId: string, benutzerId: string, anwesend: bool
 }
 
 /**
+ * Delete a Trupp (Ausbilder only, 204). Its members stay as Benutzer and are detached
+ * ("Ohne Trupp"); only the Trupp's own Ergebnisse go with it.
+ */
+export function deleteTrupp(truppId: string): Promise<void> {
+  return api<void>(`/trupps/${encodeURIComponent(truppId)}`, { method: 'DELETE' });
+}
+
+/**
+ * Confirmation text for deleteTrupp — says plainly that the people are kept, so it can't be
+ * read as "deletes everyone in it".
+ */
+export function truppLoeschenFrage(name: string, mitglieder: number): string {
+  const wer =
+    mitglieder === 0
+      ? 'Der Trupp hat keine Mitglieder.'
+      : mitglieder === 1
+        ? 'Das 1 Mitglied bleibt als Benutzer erhalten und ist danach ohne Trupp.'
+        : `Die ${mitglieder} Mitglieder bleiben als Benutzer erhalten und sind danach ohne Trupp.`;
+  return `Trupp „${name}“ löschen?\n\n${wer} Ergebnisse dieses Trupps werden gelöscht.`;
+}
+
+/**
  * The last invite link used on this device — the Join page opens on "Anmelden" when the
  * same link is opened again.
  */

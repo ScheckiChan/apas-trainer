@@ -230,3 +230,14 @@
     align-self: center;
   }
 }
+
+/* ---------- Trupp löschen ---------- */
+
+.gd-loeschen-btn {
+  color: var(--danger);
+  border-color: color-mix(in oklch, var(--danger) 30%, transparent);
+}
+
+.gd-loeschen-btn:hover {
+  background: var(--danger-subtle);
+}

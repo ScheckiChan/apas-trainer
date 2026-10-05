@@ -106,13 +106,42 @@
   color: var(--muted);
 }
 
+/* Ausbilder: a delete button beside each row (outside the link, so it isn't nested in it). */
+.tl-item {
+  display: flex;
+  align-items: center;
+}
+
+.tl-item .tl-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-with-actions .tl-row {
+  padding-right: var(--space-2);
+}
+
+.tl-with-actions .tl-head {
+  padding-right: calc(var(--space-2) + var(--touch) + var(--space-2));
+}
+
+.tl-delete {
+  flex-shrink: 0;
+  margin-right: var(--space-2);
+  color: var(--muted);
+}
+
+.tl-delete:hover {
+  color: var(--danger);
+}
+
 .dashboard-create-fields {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: var(--space-3);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   .tl-head {
     display: none;
   }

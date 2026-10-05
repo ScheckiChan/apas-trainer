@@ -13,7 +13,7 @@ import {
 } from '@apas/shared';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { AmpelDot, ChecklistToggles } from '../components/Checklist';
 import { EinmalPasswort } from '../components/EinmalPasswort';
@@ -21,7 +21,7 @@ import { Icon } from '../components/Icon';
 import { RolleSelect, RollenAbdeckung, saveRolle } from '../components/Rollen';
 import { TruppIdentitaet } from '../components/TruppIdentitaet';
 import { TruppName } from '../components/TruppName';
-import { api, errorMessage } from '../lib/api';
+import { api, deleteTrupp, errorMessage, truppLoeschenFrage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
 import { useMe, useSession } from '../lib/session';
 import './TruppDetail.css';
@@ -29,7 +29,8 @@ import './TruppDetail.css';
 export function TruppDetail() {
   const { truppId } = useParams();
   const me = useMe();
-  const { setMe } = useSession();
+  const { setMe, refresh } = useSession();
+  const navigate = useNavigate();
   const [trupp, setTrupp] = useState<Trupp | null>(null);
   const [teilnehmer, setTeilnehmer] = useState<Teilnehmer[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +92,18 @@ export function TruppDetail() {
     try {
       await api(`/trupps/${truppId}/teilnehmer/${t.id}`, { method: 'DELETE' });
       setTeilnehmer((list) => list.filter((x) => x.id !== t.id));
+    } catch (err) {
+      alert(errorMessage(err));
+    }
+  };
+
+  const loeschen = async () => {
+    if (!trupp || !confirm(truppLoeschenFrage(trupp.name, teilnehmer.length))) return;
+    try {
+      await deleteTrupp(trupp.id);
+      // The Ausbilder's own Trupp: the session copy would still name it.
+      if (me.benutzer.truppId === trupp.id) void refresh();
+      navigate('/trupps', { replace: true });
     } catch (err) {
       alert(errorMessage(err));
     }
@@ -215,6 +228,22 @@ export function TruppDetail() {
             onSaved={identitaetGespeichert}
             intro="Name und Maskottchen des Trupps — die Mitglieder können beides auch selbst ändern."
           />
+        )}
+
+        {me.benutzer.systemRolle === 'ausbilder' && (
+          <section className="card stack">
+            <h2>Trupp löschen</h2>
+            <p className="muted">
+              Die Mitglieder bleiben als Benutzer mit ihrem Konto erhalten und sind danach ohne Trupp — sie können
+              einem anderen Trupp zugeordnet werden. Gelöscht werden nur der Trupp und seine Ergebnisse.
+            </p>
+            <div>
+              <button type="button" className="btn btn-ghost gd-loeschen-btn" onClick={loeschen}>
+                <Icon name="trash-2" />
+                Trupp löschen
+              </button>
+            </div>
+          </section>
         )}
       </main>
     </>

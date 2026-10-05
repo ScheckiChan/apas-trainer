@@ -5,9 +5,9 @@ import { AppHeader } from '../components/AppHeader';
 import { HauptNav } from '../components/HauptNav';
 import { Icon } from '../components/Icon';
 import { TruppName } from '../components/TruppName';
-import { api, errorMessage } from '../lib/api';
+import { api, deleteTrupp, errorMessage, truppLoeschenFrage } from '../lib/api';
 import { countdownLabel, daysUntil, formatDate } from '../lib/format';
-import { useMe } from '../lib/session';
+import { useMe, useSession } from '../lib/session';
 import './TruppDashboard.css';
 
 /**
@@ -18,6 +18,7 @@ import './TruppDashboard.css';
 export function TruppDashboard() {
   const navigate = useNavigate();
   const me = useMe();
+  const { refresh } = useSession();
   const ausbilder = me.benutzer.systemRolle === 'ausbilder';
   const [trupps, setTrupps] = useState<TruppSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,19 @@ export function TruppDashboard() {
   }, []);
 
   const empty = trupps?.length === 0;
+
+  const loeschen = async (t: TruppSummary) => {
+    if (!confirm(truppLoeschenFrage(t.name, t.teilnehmerCount))) return;
+    setError(null);
+    try {
+      await deleteTrupp(t.id);
+      setTrupps((list) => list?.filter((x) => x.id !== t.id) ?? null);
+      // The Ausbilder's own Trupp: the session copy would still name it.
+      if (me.benutzer.truppId === t.id) void refresh();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
 
   return (
     <>
@@ -56,7 +70,7 @@ export function TruppDashboard() {
         {empty && <p className="muted">{ausbilder ? 'Noch kein Trupp angelegt.' : 'Es gibt noch keinen Trupp.'}</p>}
 
         {trupps && trupps.length > 0 && (
-          <div className="tl">
+          <div className={`tl ${ausbilder ? 'tl-with-actions' : ''}`}>
             <div className="tl-head" aria-hidden="true">
               <span>Trupp</span>
               <span>Rollen</span>
@@ -66,8 +80,19 @@ export function TruppDashboard() {
             </div>
             <ul className="tl-list">
               {trupps.map((t) => (
-                <li key={t.id}>
+                <li key={t.id} className="tl-item">
                   <TruppRow trupp={t} to={ausbilder ? `/trupps/${t.id}` : `/trupps/${t.id}/stationen`} />
+                  {ausbilder && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-icon tl-delete"
+                      onClick={() => loeschen(t)}
+                      title="Trupp löschen (Mitglieder bleiben als Benutzer erhalten)"
+                      aria-label={`Trupp ${t.name} löschen`}
+                    >
+                      <Icon name="trash-2" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
