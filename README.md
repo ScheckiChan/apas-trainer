@@ -6,10 +6,11 @@ Standalone PWA for organising cross-fire-brigade (FF-übergreifend) training for
 - **Ausbildungsleiter** log in with e-mail + password, create Übungsgruppen, share an
   invite link / QR code, track every Teilnehmer's checklist (Ampel), set the
   Prüfungstermin, manage Ressourcen and schedule Fixtermine.
-- **Teilnehmer** never get a password: they open the invite link, enter Name / FF / Rolle /
-  E-Mail and sign in through a magic link. They see and toggle their own checklist,
-  browse the Stationskarten and use the shared calendar (incl. creating
-  Individualübungen and booking Ressourcen).
+- **Teilnehmer** open the invite link and either *join* (Name, FF, Passwort) or *sign in*
+  again (Name + Passwort) — no e-mail involved. Roles are assigned afterwards, inside the
+  Gruppe, by anyone in it. Teilnehmer see and toggle their own checklist, see the whole
+  Gruppe and its role coverage, browse the Stationskarten and use the shared calendar
+  (incl. creating Individualübungen and booking Ressourcen).
 - Push reminders go out N hours before each Termin to its assigned Teilnehmer and the
   Ausbildungsleiter.
 
@@ -19,16 +20,17 @@ Standalone PWA for organising cross-fire-brigade (FF-übergreifend) training for
 apps/
   api/            Express 5 + TypeScript API, file-based JSON storage
     src/
-      routes/     auth, join, gruppen (+teilnehmer, ressourcen), termine, push
-      lib/        store (JSON collections + mutex), auth (JWT middleware), mail (magic-link stub)
+      routes/     auth, join (invite-link join/login), gruppen (+teilnehmer, ressourcen),
+                  teilnehmer (Rolle), termine, push
+      lib/        store (JSON collections + mutex), auth (JWT middleware), password (bcrypt)
       push.ts     web-push wrapper (VAPID, subscriptions)
       reminders.ts  setInterval reminder loop
       scripts/    seedAdmin.ts, generateVapid.ts
     Dockerfile
   web/            React 18 + Vite PWA
     public/       manifest.webmanifest, sw.js, icons/
-    src/views/    Login, GroupsDashboard, GroupDetail, Join, MagicLinkVerify,
-                  TeilnehmerView, Stations, Calendar (+ one .css per view)
+    src/views/    Login, GroupsDashboard, GroupDetail, Join, TeilnehmerView,
+                  Stations, Calendar (+ one .css per view)
     Dockerfile, nginx.conf.template
 packages/
   shared/         Types + small pure helpers shared by api and web
@@ -48,8 +50,8 @@ npm run seed-admin   # create the first Ausbildungsleiter (see "First run")
 npm run dev          # API on :3001, web on http://localhost:5173 (proxies /api)
 ```
 
-- Magic links are **not e-mailed** in v1 — they are printed to the API console
-  (look for `MAGIC LINK (E-Mail-Stub)`). Copy the link into the browser.
+- To try the Teilnehmer side, copy a Gruppe's invite link from GroupDetail into a private
+  window and use "Neu beitreten". Coming back later works on the same link via "Anmelden".
 - The service worker is only registered in production builds, so it never
   interferes with Vite's dev server. Use `npm run build && npm run preview -w @apas/web`
   (with the API running) to test the installable PWA locally.
@@ -98,8 +100,6 @@ All configuration is read by the API from the environment. In dev, `npm run dev`
 | `JWT_SECRET`                | dev fallback                 | **Required in production** (`openssl rand -base64 48`)             |
 | `LEITER_TOKEN_TTL`          | `7d`                         | Ausbildungsleiter session length                                   |
 | `TEILNEHMER_TOKEN_TTL`      | `90d`                        | Teilnehmer session length                                          |
-| `MAGIC_LINK_TTL_MINUTES`    | `30`                         | Magic links are single-use and expire after this                   |
-| `PUBLIC_URL`                | `http://localhost:5173`      | Base URL used to build magic links — set to the public web URL     |
 | `CORS_ORIGIN`               | _(empty)_                    | Only needed if web and API are served from different origins       |
 | `TRUST_PROXY`               | `1` in production            | Express `trust proxy` (correct client IPs for rate limiting)       |
 | `VAPID_PUBLIC_KEY`          | _(empty)_                    | Push is disabled while empty                                       |
@@ -133,14 +133,14 @@ or `localhost`). On iOS, push only works once the PWA has been added to the home
 ```bash
 npm ci
 npm run build
-NODE_ENV=production JWT_SECRET=… PUBLIC_URL=https://apas.example.at npm start
+NODE_ENV=production JWT_SECRET=… npm start
 # serve apps/web/dist as static files and proxy /api → the API
 ```
 
 ### Docker
 
 ```bash
-cp .env.example .env    # set JWT_SECRET, PUBLIC_URL, VAPID_* …
+cp .env.example .env    # set JWT_SECRET, VAPID_* …
 docker compose up -d --build
 docker compose exec api node dist/scripts/seedAdmin.js
 ```
@@ -151,12 +151,13 @@ docker compose exec api node dist/scripts/seedAdmin.js
 - **web** (`apps/web/Dockerfile`): multi-stage build → `nginx:alpine` serving the static
   PWA on `WEB_PORT` (default 8080) and reverse-proxying `/api/` to `api:3001`.
 
-Put your TLS-terminating reverse proxy in front of **web** only and set `PUBLIC_URL` to
-that public URL. Both Dockerfiles use the repo root as build context.
+Put your TLS-terminating reverse proxy in front of **web** only. Both Dockerfiles use the
+repo root as build context.
 
 **Backups:** everything lives in the `DATA_DIR` JSON files
 (`ausbildungsleiter.json`, `gruppen.json`, `teilnehmer.json`, `ressourcen.json`,
-`termine.json`, `magiclinks.json`, `pushsubscriptions.json`, `reminders.json`).
+`termine.json`, `pushsubscriptions.json`, `reminders.json`). A leftover `magiclinks.json`
+from before the password switch is no longer read and can be deleted.
 Copying the volume is a complete backup.
 
 ## API overview
@@ -167,10 +168,11 @@ All endpoints are under `/api`. Auth is `Authorization: Bearer <jwt>`.
 | ---------------------------------------------------------- | ----------------------------- |
 | `POST /auth/leiter/login`                                  | public                        |
 | `GET  /auth/leiter/me`                                     | Leiter                        |
-| `POST /auth/teilnehmer/verify` (magic-link token → JWT)    | public                        |
-| `POST /auth/teilnehmer/request-link` (re-entry)            | public                        |
 | `GET  /auth/teilnehmer/me`                                 | Teilnehmer                    |
-| `GET/POST /join/:inviteToken`                              | public                        |
+| `GET /gruppen/:inviteToken/join` (Gruppe name + date)      | public                        |
+| `POST /gruppen/:inviteToken/join` {name, ff, password} → JWT | public                      |
+| `POST /gruppen/:inviteToken/login` {name, password} → JWT  | public                        |
+| `PATCH /teilnehmer/:tid/rolle` {rolle \| null}             | owner or any member           |
 | `GET/POST /gruppen`                                        | Leiter                        |
 | `GET /gruppen/:id` · `PATCH /gruppen/:id`                  | member / owner                |
 | `POST /gruppen/:id/invite/regenerate`                      | owner                         |
@@ -211,29 +213,60 @@ Things SPEC.md left open and how they were resolved:
   different payload (`email` vs `gruppeId`), separate middleware (`requireLeiter`,
   `requireTeilnehmer`, `requireAny`), and separate `localStorage` keys, so one device
   can hold both sessions without them leaking into each other.
-- Session lengths: Ausbildungsleiter 7 days, Teilnehmer 90 days (they have no password,
-  so re-login friction should be low). Both configurable.
-- Magic links: 32 random bytes, stored only as a SHA-256 hash, single-use, 30-minute
-  expiry, link format `PUBLIC_URL/auth/verify?token=…`. The verify page guards against
-  React StrictMode's double effect so the single-use token isn't burned twice.
-- Re-entry: the Login page has a "Teilnehmer — Anmeldelink anfordern" form. It sends a
-  fresh link for **every** Gruppe membership of that e-mail and always answers `202`,
-  so it can't be used to discover registered addresses.
-- Joining twice with the same e-mail in the same Gruppe does not create a duplicate;
-  it re-sends the magic link. Name/FF/Rolle are only overwritten while the e-mail is
-  still unverified.
+- Session lengths: Ausbildungsleiter 7 days, Teilnehmer 90 days (logging in again on a
+  phone at the Übung should be rare). Both configurable.
+- Teilnehmer join and log in with a **password** on the Gruppe's invite link
+  (`/join/:token`, tabs "Neu beitreten" / "Anmelden"). There is no e-mail at all: no
+  address is collected, nothing is sent, and there is no SMTP dependency. Joining
+  logs in immediately.
+- Identity is **(Gruppe, Name) + Passwort**, not a global username, so two Gruppen can
+  each have a "Max". Names are unique within a Gruppe, compared trimmed,
+  whitespace-collapsed and case-insensitive ("max  muster" = "Max Muster"). A second
+  join with a taken name gets a `409` that tells the person to use "Anmelden" (or to
+  add an initial). Wrong name and wrong password give the same `401` error. Unknown
+  names still run a bcrypt compare, so timing doesn't reveal which names exist.
+- Passwords: at least 8 characters for Teilnehmer (10 for Ausbildungsleiter via the
+  seed script), at most 72 (bcrypt's input limit, so input is rejected rather than
+  silently truncated). Both use the same bcrypt cost, 12 (`lib/password.ts`).
+- Login is tied to the invite token. After "Neu erzeugen" of the invite link,
+  Teilnehmer need the new link to log in again (existing sessions keep working).
+  The browser remembers the last used invite link, and the Login page offers a
+  shortcut back to it.
+- There is no password reset for Teilnehmer. If someone forgets theirs, the
+  Ausbildungsleiter removes them in GroupDetail and they join again. This loses their
+  checklist ticks and Termin assignments, which is acceptable at this scale.
+- Migration: Teilnehmer created under the old magic-link flow have no password. Login
+  tells them to use "Neu beitreten" once with exactly the same name. That **claims**
+  the existing record (sets the password, keeps id, Rolle, checklist and Termine) and
+  drops the stored e-mail. Their old sessions remain valid until they expire.
 - A Teilnehmer record belongs to exactly one Gruppe. The same person in two Gruppen
-  has two records and two magic links; the browser holds one Teilnehmer session at a
-  time (the most recently verified one).
+  has two accounts; the browser holds one Teilnehmer session at a time (the most
+  recent login).
 - No sign-up endpoint exists. Ausbildungsleiter accounts are created only via
   `npm run seed-admin`.
-- Rate limits: 300 req/min per IP on the whole API, plus 20 per 15 min on login,
-  join, magic-link request and verify.
+- Rate limits: 300 req/min per IP on the whole API. Password logins (Ausbildungsleiter
+  and Teilnehmer) allow 20 **failed** attempts per 15 min per IP. Successful logins
+  don't count, so a whole Gruppe behind one NAT can still sign in. Join allows 30
+  attempts per 15 min per IP, and every attempt counts because it creates accounts.
+
+**Rollen**
+- Rolle is **not** chosen at join. New Teilnehmer start with `rolle: null` ("keine
+  Rolle"), and the Rolle is assigned later with `PATCH /teilnehmer/:id/rolle`.
+- Anyone in the Gruppe may change **anyone's** Rolle at any time: the owning
+  Ausbildungsleiter (dropdown per row in GroupDetail) and every Teilnehmer (tab
+  "Gruppe" in the Teilnehmer view). Role shuffling before the exam is a group
+  decision. Checklists stay restricted (own checklist, or the Ausbildungsleiter).
+- Duplicate roles are allowed (Ergänzungsteilnehmer in Gruppen with more than 4
+  people). Both views show the coverage as "x/4 Rollen besetzt" with one chip per
+  Rolle (×n when held more than once), but nothing is blocked.
 
 **Data model**
 - The Checkliste is embedded in the Teilnehmer record. The Teilnehmer and the owning
-  Ausbildungsleiter can both toggle it. For GKDT, `tauglichkeit` is shown as greyed
-  "N/A" and the API ignores attempts to change it.
+  Ausbildungsleiter can both toggle it. The Tauglichkeit exemption follows whoever
+  **currently** holds GKDT: for them `tauglichkeit` is shown as greyed "N/A", the API
+  ignores changes to it, and the Ampel doesn't count it. The stored value is kept, so
+  it comes back unchanged if the Rolle moves on. Without a Rolle, all three items are
+  required.
 - The checklist labels stay as the short codes **AT** and **ATS3** (plus
   "Tauglichkeit"), because the spec doesn't define their long names. Change them in one
   place: `CHECKLIST_LABELS` in `packages/shared`.
@@ -244,8 +277,8 @@ Things SPEC.md left open and how they were resolved:
 - Ressourcen are scoped per Gruppe. Only the Ausbildungsleiter creates or deletes them
   (in GroupDetail), and every member can book them on Termine. Deleting a Ressource
   keeps its Termine but removes the booking.
-- Removing a Teilnehmer also removes them from all Termine and deletes their
-  magic links and push subscriptions.
+- Removing a Teilnehmer also removes them from all Termine and deletes their push
+  subscriptions.
 - `Buchung` is the shared type for "Ressource booked by a Termin for a time window";
   overlap results come back as `BuchungsKonflikt[]`.
 
@@ -299,6 +332,3 @@ Things SPEC.md left open and how they were resolved:
   focus points per station, the Fehlerpunkte-Grundregel (max. 35 in total, per-station
   limit, repeat after 14 days at the earliest), and the source cited as plain text.
   It has no per-station point limits or procedural details beyond that.
-- Magic-link e-mail is a clearly marked stub, `sendMagicLink()` in
-  `apps/api/src/lib/mail.ts`, which logs the link. Wiring a real SMTP provider is a
-  follow-up.
