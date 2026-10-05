@@ -197,6 +197,7 @@ systemRolle, read from storage on every request. Types are in `packages/shared`.
 | `POST /trupps/:inviteToken/beitreten` → `MeResponse`             | signed in, account without Trupp (rate-limited) |
 | `GET /trupps` → `TruppSummary[]`                                 | Ausbilder (with invite) · Prüfer (without) |
 | `POST /trupps` · `PATCH /trupps/:id` · `POST /trupps/:id/invite/regenerate` | Ausbilder                   |
+| `PATCH /trupps/:id/identitaet` {name?, icon?} → `Trupp`          | Ausbilder · Teilnehmer of that Trupp (else 403) |
 | `GET /trupps/:id`                                                | Ausbilder · Prüfer · member            |
 | `GET /trupps/:id/teilnehmer` → `Teilnehmer[]`                    | Ausbilder · member                     |
 | `POST /trupps/:id/teilnehmer` {name, ff?} → {teilnehmer, tempPassword} | Ausbilder                        |
@@ -543,6 +544,31 @@ Things SPEC.md left open and how they were resolved:
 - Duplicate roles are allowed (Ergänzungsteilnehmer in Trupps with more than 4
   people). Both views show the coverage as "x/4 Rollen besetzt" with one chip per
   Rolle (×n when held more than once), but nothing is blocked.
+
+**Trupp-Identität: Name + Icon**
+- For fun and team spirit during training, each Trupp can rename itself and pick a
+  mascot icon. **Who may edit:** any Ausbilder, or any Teilnehmer who is a member of that
+  Trupp (`PATCH /trupps/:id/identitaet`, rule `kannTruppIdentitaetBearbeiten()` in
+  shared). Teilnehmer of another Trupp, accounts without a Trupp and Prüfer (even a Prüfer
+  who is a member) get `403`.
+  No approval step. Members edit it in their "Trupp" tab, Ausbilder in Trupp-Details.
+  The Ausbilder-only `PATCH /trupps/:id` (Prüfungstermin etc.) is unchanged.
+- **Name:** trimmed and whitespace-collapsed, 1–40 characters (`TRUPP_NAME_MAX`), content
+  otherwise free ("Die Rauchfresser"). The same limit now applies to creating a Trupp and
+  the Ausbilder edit (previously 2–100); existing longer names are left alone.
+- **Icon set** (`TRUPP_ICONS`, 16 Lucide icons from the existing `Icon.tsx`): flame,
+  fire-extinguisher, droplets, siren, axe, shield, zap, target, trophy, crown, rocket,
+  mountain, anchor, star, bird, dog. Skulls and weapons were left out as unsuitable for
+  Feuerwehr training. The server rejects anything outside the set (`400`), so a stored
+  icon always renders. Only the icon id is stored (`Trupp.icon`, `null` = not chosen;
+  existing Trupps are backfilled by an idempotent migration).
+- **Default:** `users` (`DEFAULT_TRUPP_ICON`), deliberately not pickable and drawn muted,
+  so "nothing chosen yet" never looks like a chosen mascot. Chosen icons use the accent.
+- The icon sits next to the Trupp name everywhere a Trupp is listed (`TruppName`
+  component): Trupp list, Trupp-Details and Teilnehmer header, Rangliste rows, Kalender
+  Teilnehmer-Picker, invite page, Benutzerverwaltung, Konto menu.
+- The picker is a native radio group (arrow keys work, German labels), 48 px tiles; the
+  selected tile gets a thicker ring and a check badge, not just a colour change.
 
 **Data model**
 - The Checkliste is embedded in the account record (it describes the person, so it
