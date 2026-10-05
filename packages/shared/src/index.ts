@@ -186,6 +186,11 @@ export interface Termin {
   ende: string;
   /** Benutzer ids (any Trupp, or none). */
   teilnehmerIds: string[];
+  /**
+   * Fixtermine only: Benutzer ids who confirmed "anwesend" themselves (or were marked by an
+   * Ausbilder) — separate from the assigned teilnehmerIds. Always [] for Individualübungen.
+   */
+  anwesendIds: string[];
   ressourceId?: string | null;
   /** Benutzer id of the creator. Termine created before the unified accounts may hold 'ausbildungsleiter'. */
   createdBy: string;
