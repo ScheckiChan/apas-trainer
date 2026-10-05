@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { config } from './config.js';
+import { requireAuth } from './lib/auth.js';
 import { errorHandler } from './lib/http.js';
 import { authRouter } from './routes/auth.js';
 import { benutzerRouter } from './routes/benutzer.js';
@@ -41,8 +42,19 @@ export function createApp() {
   // still sign in, while brute force is capped at 20 wrong passwords per 15 min and IP.
   const loginLimiter = strict({ limit: 20, skipSuccessfulRequests: true });
   // Registering / joining creates or changes accounts — every attempt counts. One shared
-  // budget for all four endpoints.
+  // budget per IP for registration and the invite-token endpoints.
   const accountLimiter = strict({ limit: 30 });
+  // Self-service Trupp-Wahl join: authenticated, so budgeted per account instead of per IP —
+  // a whole event behind one venue Wi-Fi can register + self-join without starving each
+  // other, while a single account still can't hammer it. Runs after requireAuth (below).
+  const selbstBeitrittLimiter = rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 10,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Zu viele Versuche — bitte später erneut probieren' },
+    keyGenerator: (req) => `benutzer:${req.benutzer!.id}`,
+  });
 
   app.use('/api', apiLimiter);
   app.get('/api/health', (_req, res) => {
@@ -53,7 +65,8 @@ export function createApp() {
   app.post('/api/auth/registrieren', accountLimiter);
   app.post('/api/trupps/:token/join', accountLimiter);
   app.post('/api/trupps/:token/beitreten', accountLimiter);
-  app.post('/api/trupps/waehlbar/:truppId/beitreten', accountLimiter);
+  // requireAuth first so the limiter can key by account (unauthenticated → 401 here).
+  app.post('/api/trupps/waehlbar/:truppId/beitreten', requireAuth, selbstBeitrittLimiter);
 
   app.use('/api/auth', authRouter);
   app.use('/api/benutzer', benutzerRouter);
