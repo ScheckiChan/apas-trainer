@@ -1,12 +1,14 @@
-import type {
-  Benutzer,
-  BenutzerUebersicht,
-  Einstellungen,
-  Ressource,
-  StationErgebnis,
-  Teilnehmer,
-  Termin,
-  Trupp,
+import {
+  isTruppIcon,
+  type Benutzer,
+  type BenutzerUebersicht,
+  type Einstellungen,
+  type Ressource,
+  type StationErgebnis,
+  type Teilnehmer,
+  type Termin,
+  type Trupp,
+  type TruppIcon,
 } from '@apas/shared';
 import type {
   BenutzerRecord,
@@ -18,10 +20,20 @@ import type {
   TruppRecord,
 } from './db.js';
 
+/**
+ * The stored icon if it is (still) one of TRUPP_ICONS, else null — so a missing field
+ * (pre-migration record) or a hand-edited bogus value never reaches the frontend.
+ */
+export function truppIconOf(trupp: Pick<TruppRecord, 'icon'> | undefined): TruppIcon | null {
+  const icon = trupp?.icon;
+  return isTruppIcon(icon) ? icon : null;
+}
+
 export function toTrupp(trupp: TruppRecord, opts: { includeInvite: boolean }): Trupp {
   return {
     id: trupp.id,
     name: trupp.name,
+    icon: truppIconOf(trupp),
     stufe: trupp.stufe,
     pruefungstermin: trupp.pruefungstermin,
     ownerId: trupp.ownerId,
@@ -57,13 +69,14 @@ export function toTeilnehmer(b: MitgliedRecord): Teilnehmer {
   };
 }
 
-export function toBenutzerUebersicht(b: BenutzerRecord, truppName: ReadonlyMap<string, string>): BenutzerUebersicht {
+export function toBenutzerUebersicht(b: BenutzerRecord, trupps: ReadonlyMap<string, TruppRecord>): BenutzerUebersicht {
+  const trupp = b.truppId ? trupps.get(b.truppId) : undefined;
   return {
     id: b.id,
     name: b.name,
     ff: b.ff,
     systemRolle: b.systemRolle,
-    trupp: b.truppId ? { id: b.truppId, name: truppName.get(b.truppId) ?? '—' } : null,
+    trupp: b.truppId ? { id: b.truppId, name: trupp?.name ?? '—', icon: truppIconOf(trupp) } : null,
     createdAt: b.createdAt,
   };
 }

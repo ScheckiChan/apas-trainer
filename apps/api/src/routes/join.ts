@@ -6,6 +6,7 @@ import { requireAuth } from '../lib/auth.js';
 import { ffSchema, findByName, nameSchema, nameVergeben, newBenutzerRecord, passwordSchema } from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { hashPassword } from '../lib/password.js';
+import { truppIconOf } from '../serialize.js';
 import { authSession, meResponse } from './auth.js';
 
 /**
@@ -26,7 +27,7 @@ async function truppByInvite(token: string): Promise<TruppRecord> {
 
 joinRouter.get('/:token/join', async (req, res) => {
   const trupp = await truppByInvite(String(req.params.token));
-  const body: JoinInfo = { truppName: trupp.name, pruefungstermin: trupp.pruefungstermin };
+  const body: JoinInfo = { truppName: trupp.name, truppIcon: truppIconOf(trupp), pruefungstermin: trupp.pruefungstermin };
   res.json(body);
 });
 

@@ -18,11 +18,11 @@ const LETZTER_AUSBILDER =
 
 async function uebersicht(filter: (b: BenutzerRecord) => boolean): Promise<BenutzerUebersicht[]> {
   const [benutzer, trupps] = await Promise.all([db.benutzer.all(), db.trupps.all()]);
-  const truppName = new Map(trupps.map((t) => [t.id, t.name]));
+  const truppById = new Map(trupps.map((t) => [t.id, t]));
   return benutzer
     .filter(filter)
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-    .map((b) => toBenutzerUebersicht(b, truppName));
+    .map((b) => toBenutzerUebersicht(b, truppById));
 }
 
 /** Every account of the instance. */

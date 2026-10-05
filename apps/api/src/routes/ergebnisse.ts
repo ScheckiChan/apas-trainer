@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { db, type ErgebnisRecord } from '../db.js';
 import { loadTrupp, requireAuth } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
-import { toErgebnis } from '../serialize.js';
+import { toErgebnis, truppIconOf } from '../serialize.js';
 
 /** Mounted at /api/trupps/:truppId/ergebnisse */
 export const ergebnisseRouter = Router({ mergeParams: true });
@@ -93,6 +93,7 @@ ranglisteRouter.get('/', requireAuth, async (req, res) => {
     trupps.map((t) => ({
       truppId: t.id,
       truppName: t.name,
+      truppIcon: truppIconOf(t),
       eigen: req.benutzer!.truppId === t.id,
       ergebnisse: ergebnisse.filter((e) => e.truppId === t.id).map(toErgebnis),
     })),
