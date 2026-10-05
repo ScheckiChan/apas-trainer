@@ -1,43 +1,37 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { SystemRolle } from '@apas/shared';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
-import { db, type TruppRecord } from '../db.js';
+import { db, type BenutzerRecord, type TruppRecord } from '../db.js';
 import { HttpError } from './http.js';
 
 /*
- * Two strictly separate token types. The `kind` claim is the discriminator and every
- * middleware checks it — a Teilnehmer token is never accepted where a Leiter token
- * is required and vice versa. Different audiences add a second layer of separation.
+ * One token kind for every account. The token only proves *who* is calling; what they
+ * may do (systemRolle) and which Trupp they belong to are read from benutzer.json on
+ * every request, so a role change or Trupp move takes effect immediately without
+ * re-login. `systemRolle` in the claims is informational (state at login time).
+ *
+ * Tokens issued before the unified accounts (audiences apas:leiter / apas:teilnehmer)
+ * are still accepted: the migration kept every id, so their `sub` resolves to the same
+ * person. They simply run out at their original expiry.
  */
 
-export interface LeiterTokenPayload {
-  kind: 'leiter';
-  sub: string; // Ausbildungsleiter id
-  email: string;
+export interface BenutzerTokenPayload {
+  kind: 'benutzer';
+  sub: string; // Benutzer id
+  systemRolle: SystemRolle;
 }
 
-export interface TeilnehmerTokenPayload {
-  kind: 'teilnehmer';
-  sub: string; // Teilnehmer id
-  truppId: string;
-}
+const BENUTZER_AUD = 'apas:benutzer';
+const LEGACY_AUDS = ['apas:leiter', 'apas:teilnehmer'];
+const KNOWN_KINDS = new Set(['benutzer', 'leiter', 'teilnehmer']);
 
-const LEITER_AUD = 'apas:leiter';
-const TEILNEHMER_AUD = 'apas:teilnehmer';
-
-export function signLeiterToken(p: Omit<LeiterTokenPayload, 'kind'>): string {
-  const payload: LeiterTokenPayload = { kind: 'leiter', ...p };
+export function signBenutzerToken(b: Pick<BenutzerRecord, 'id' | 'systemRolle'>): string {
+  const payload: BenutzerTokenPayload = { kind: 'benutzer', sub: b.id, systemRolle: b.systemRolle };
+  const ttl = b.systemRolle === 'ausbilder' ? config.ausbilderTokenTtl : config.benutzerTokenTtl;
   return jwt.sign(payload, config.jwtSecret, {
-    audience: LEITER_AUD,
-    expiresIn: config.leiterTokenTtl as jwt.SignOptions['expiresIn'],
-  });
-}
-
-export function signTeilnehmerToken(p: Omit<TeilnehmerTokenPayload, 'kind'>): string {
-  const payload: TeilnehmerTokenPayload = { kind: 'teilnehmer', ...p };
-  return jwt.sign(payload, config.jwtSecret, {
-    audience: TEILNEHMER_AUD,
-    expiresIn: config.teilnehmerTokenTtl as jwt.SignOptions['expiresIn'],
+    audience: BENUTZER_AUD,
+    expiresIn: ttl as jwt.SignOptions['expiresIn'],
   });
 }
 
@@ -47,92 +41,87 @@ function bearer(req: Request): string | null {
   return h.slice(7).trim() || null;
 }
 
-function verifyLeiter(token: string): LeiterTokenPayload | null {
+/** Returns the account id of a valid token (current or legacy), else null. */
+function verifyToken(token: string): string | null {
   try {
-    const p = jwt.verify(token, config.jwtSecret, { audience: LEITER_AUD }) as jwt.JwtPayload;
-    if (p.kind !== 'leiter' || typeof p.sub !== 'string') return null;
-    return { kind: 'leiter', sub: p.sub, email: String(p.email) };
+    const p = jwt.verify(token, config.jwtSecret, { audience: [BENUTZER_AUD, ...LEGACY_AUDS] }) as jwt.JwtPayload;
+    if (!KNOWN_KINDS.has(String(p.kind)) || typeof p.sub !== 'string') return null;
+    return p.sub;
   } catch {
     return null;
   }
 }
 
-function verifyTeilnehmer(token: string): TeilnehmerTokenPayload | null {
-  try {
-    const p = jwt.verify(token, config.jwtSecret, { audience: TEILNEHMER_AUD }) as jwt.JwtPayload;
-    // Tokens issued before the Gruppe → Trupp rename carry the id as `gruppeId`.
-    const truppId: unknown = p.truppId ?? p.gruppeId;
-    if (p.kind !== 'teilnehmer' || typeof p.sub !== 'string' || typeof truppId !== 'string') return null;
-    return { kind: 'teilnehmer', sub: p.sub, truppId };
-  } catch {
-    return null;
-  }
+/** The caller, as currently stored (not as claimed in the token). */
+export interface Angemeldet {
+  id: string;
+  name: string;
+  systemRolle: SystemRolle;
+  truppId: string | null;
 }
-
-export type Principal = LeiterTokenPayload | TeilnehmerTokenPayload;
 
 declare module 'express-serve-static-core' {
   interface Request {
-    leiter?: LeiterTokenPayload;
-    teilnehmer?: TeilnehmerTokenPayload;
+    benutzer?: Angemeldet;
   }
 }
 
-/** Requires a valid Ausbildungsleiter token. */
-export async function requireLeiter(req: Request, _res: Response, next: NextFunction) {
-  const token = bearer(req);
-  const p = token ? verifyLeiter(token) : null;
-  if (!p) throw new HttpError(401, 'Anmeldung als Ausbildungsleiter erforderlich');
-  if (!(await db.leiter.get(p.sub))) throw new HttpError(401, 'Konto existiert nicht mehr');
-  req.leiter = p;
-  next();
-}
-
-/** Requires a valid Teilnehmer token whose Teilnehmer still exists. */
-export async function requireTeilnehmer(req: Request, _res: Response, next: NextFunction) {
-  const token = bearer(req);
-  const p = token ? verifyTeilnehmer(token) : null;
-  if (!p) throw new HttpError(401, 'Anmeldung als Teilnehmer erforderlich');
-  const t = await db.teilnehmer.get(p.sub);
-  if (!t || t.truppId !== p.truppId) throw new HttpError(401, 'Teilnehmer existiert nicht mehr');
-  req.teilnehmer = p;
-  next();
-}
-
-/** Accepts either token type; sets req.leiter or req.teilnehmer. */
-export async function requireAny(req: Request, _res: Response, next: NextFunction) {
+async function authenticate(req: Request): Promise<Angemeldet> {
   const token = bearer(req);
   if (!token) throw new HttpError(401, 'Anmeldung erforderlich');
-  const l = verifyLeiter(token);
-  if (l && (await db.leiter.get(l.sub))) {
-    req.leiter = l;
-    return next();
-  }
-  const t = verifyTeilnehmer(token);
-  if (t) {
-    const rec = await db.teilnehmer.get(t.sub);
-    if (rec && rec.truppId === t.truppId) {
-      req.teilnehmer = t;
-      return next();
+  const id = verifyToken(token);
+  const rec = id ? await db.benutzer.get(id) : undefined;
+  if (!rec) throw new HttpError(401, 'Sitzung abgelaufen oder ungültig — bitte neu anmelden');
+  req.benutzer = { id: rec.id, name: rec.name, systemRolle: rec.systemRolle, truppId: rec.truppId };
+  return req.benutzer;
+}
+
+/** Requires a valid token of an account that still exists. Sets req.benutzer. */
+export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
+  await authenticate(req);
+  next();
+}
+
+const ROLLEN_TEXT: Record<SystemRolle, string> = { ausbilder: 'Ausbilder', pruefer: 'Prüfer', teilnehmer: 'Teilnehmer' };
+
+/** Must run after requireAuth. 403 unless the caller's current systemRolle is one of `rollen`. */
+export function requireRolle(...rollen: SystemRolle[]): RequestHandler {
+  return (req, _res, next) => {
+    if (!req.benutzer || !rollen.includes(req.benutzer.systemRolle)) {
+      throw new HttpError(403, `Nur für ${rollen.map((r) => ROLLEN_TEXT[r]).join(' und ')} erlaubt`);
     }
-  }
-  throw new HttpError(401, 'Anmeldung erforderlich');
+    next();
+  };
+}
+
+/** requireAuth + systemRolle 'ausbilder' (everything the former Ausbildungsleiter could do). */
+export async function requireAusbilder(req: Request, _res: Response, next: NextFunction) {
+  const b = await authenticate(req);
+  if (b.systemRolle !== 'ausbilder') throw new HttpError(403, 'Nur für Ausbilder erlaubt');
+  next();
+}
+
+export const isAusbilder = (req: Request): boolean => req.benutzer?.systemRolle === 'ausbilder';
+
+/**
+ * Who may see a Trupp:
+ * - 'trupp':       Trupp record + Ergebnisse — Ausbilder, Prüfer (they score any Trupp's
+ *                  station run) and members of that Trupp.
+ * - 'mitglieder':  member list incl. Checklisten (Tauglichkeit!) — Ausbilder and members only.
+ */
+export type TruppSicht = 'trupp' | 'mitglieder';
+
+function darfSehen(b: Angemeldet, trupp: TruppRecord, sicht: TruppSicht): boolean {
+  if (b.systemRolle === 'ausbilder' || b.truppId === trupp.id) return true;
+  return sicht === 'trupp' && b.systemRolle === 'pruefer';
 }
 
 /**
- * Loads the Trupp from :truppId and checks the caller may access it:
- * the owning Ausbildungsleiter, or a Teilnehmer of that Trupp.
- * Must run after requireAny / requireLeiter / requireTeilnehmer.
+ * Loads the Trupp from :truppId and checks the caller may see it (404 otherwise, so Trupp
+ * ids of others aren't confirmed). Must run after requireAuth.
  */
-export async function loadTruppForPrincipal(req: Request): Promise<TruppRecord> {
-  const truppId = String(req.params.truppId);
-  const trupp = await db.trupps.get(truppId);
-  if (!trupp) throw new HttpError(404, 'Trupp nicht gefunden');
-  if (req.leiter && trupp.ownerId === req.leiter.sub) return trupp;
-  if (req.teilnehmer && req.teilnehmer.truppId === trupp.id) return trupp;
-  throw new HttpError(404, 'Trupp nicht gefunden');
-}
-
-export function isOwner(req: Request, trupp: TruppRecord): boolean {
-  return !!req.leiter && req.leiter.sub === trupp.ownerId;
+export async function loadTrupp(req: Request, sicht: TruppSicht): Promise<TruppRecord> {
+  const trupp = await db.trupps.get(String(req.params.truppId));
+  if (!trupp || !darfSehen(req.benutzer!, trupp, sicht)) throw new HttpError(404, 'Trupp nicht gefunden');
+  return trupp;
 }

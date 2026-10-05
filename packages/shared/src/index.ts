@@ -80,12 +80,55 @@ export function checklistAmpel(rolle: Rolle | null, checkliste: Checkliste): Amp
 }
 
 // ---------------------------------------------------------------------------
+// Systemrollen (account level) — NOT the Trupp-internal APAS-Rolle above
+// ---------------------------------------------------------------------------
+
+/**
+ * What an account may do in the app. Completely separate from `Rolle` (GKDT, ATF/ATM1, …),
+ * which is the position a person holds inside their Trupp for the exam. A `teilnehmer`
+ * account can hold any APAS-Rolle; an `ausbilder` or `pruefer` usually holds none.
+ */
+export const SYSTEM_ROLLEN = ['ausbilder', 'pruefer', 'teilnehmer'] as const;
+export type SystemRolle = (typeof SYSTEM_ROLLEN)[number];
+
+export const SYSTEM_ROLLE_LABELS: Record<SystemRolle, string> = {
+  ausbilder: 'Ausbilder',
+  pruefer: 'Prüfer',
+  teilnehmer: 'Teilnehmer',
+};
+
+/**
+ * "Ergebnis speichern" rule, shared by API and web: Ausbilder and Prüfer may save for any
+ * Trupp, a Teilnehmer only for the Trupp they belong to.
+ */
+export function kannErgebnisSpeichern(
+  benutzer: { systemRolle: SystemRolle; truppId: string | null },
+  truppId: string,
+): boolean {
+  return benutzer.systemRolle !== 'teilnehmer' || benutzer.truppId === truppId;
+}
+
+// ---------------------------------------------------------------------------
 // Entities
 // ---------------------------------------------------------------------------
 
-export interface Ausbildungsleiter {
+/**
+ * One account = one global identity. `name` is both the display name and the login
+ * identifier (unique instance-wide, compared case-insensitively). Trupp membership and
+ * the Trupp-internal APAS-Rolle are optional.
+ */
+export interface Benutzer {
   id: string;
-  email: string;
+  name: string;
+  /** Freiwillige Feuerwehr — null if never given (self-registration doesn't ask for it). */
+  ff: string | null;
+  systemRolle: SystemRolle;
+  /** null = not (yet) attached to a Trupp. */
+  truppId: string | null;
+  /** APAS-Rolle within the Trupp; always null without a Trupp. */
+  rolle: Rolle | null;
+  checkliste: Checkliste;
+  createdAt: string;
 }
 
 export interface Trupp {
@@ -94,8 +137,9 @@ export interface Trupp {
   stufe: Stufe;
   /** ISO date (YYYY-MM-DD) */
   pruefungstermin?: string | null;
+  /** Id of the Ausbilder account that created the Trupp (informational — every Ausbilder manages every Trupp). */
   ownerId: string;
-  /** Only present for the owning Ausbildungsleiter. */
+  /** Only present for Ausbilder. */
   inviteToken?: string;
   createdAt: string;
 }
@@ -107,13 +151,17 @@ export interface TruppSummary extends Trupp {
   rollenBesetzt: number;
 }
 
+/** An account seen as a member of a Trupp (GET /trupps/:id/teilnehmer and friends). */
 export interface Teilnehmer {
+  /** Same id as the Benutzer account. */
   id: string;
   truppId: string;
   name: string;
-  ff: string;
-  /** Assigned in the Trupp at any time (not at join). null = noch keine Rolle. */
+  ff: string | null;
+  systemRolle: SystemRolle;
+  /** APAS-Rolle, assigned in the Trupp at any time (not at join). null = noch keine Rolle. */
   rolle: Rolle | null;
+  /** When the account was attached to this Trupp. */
   joinedAt: string;
   checkliste: Checkliste;
 }
@@ -136,24 +184,26 @@ export interface Termin {
   start: string;
   /** ISO datetime */
   ende: string;
-  /** Teilnehmer of any Trupp. */
+  /** Benutzer ids (any Trupp, or none). */
   teilnehmerIds: string[];
   ressourceId?: string | null;
-  /** teilnehmerId or 'ausbildungsleiter' */
+  /** Benutzer id of the creator. Termine created before the unified accounts may hold 'ausbildungsleiter'. */
   createdBy: string;
 }
 
 /**
- * A Teilnehmer as listed in the shared calendar's picker (GET /termine/personen): only what
- * is needed to assign people across Trupps — no Checkliste.
+ * An account as listed in the shared calendar's picker (GET /termine/personen): only what
+ * is needed to assign people across Trupps — no Checkliste. Accounts without a Trupp are
+ * included with truppId/truppName null.
  */
 export interface KalenderPerson {
   id: string;
   name: string;
-  ff: string;
+  ff: string | null;
+  systemRolle: SystemRolle;
   rolle: Rolle | null;
-  truppId: string;
-  truppName: string;
+  truppId: string | null;
+  truppName: string | null;
 }
 
 /** A Ressource booked by a Termin for a time window. */
@@ -249,7 +299,7 @@ export interface ErgebnisInput {
 export interface RanglistenEintrag {
   truppId: string;
   truppName: string;
-  /** The calling Teilnehmer's own Trupp (always false for an Ausbildungsleiter, who usually owns them all). */
+  /** The Trupp the calling account belongs to (false for every row if it has no Trupp). */
   eigen: boolean;
   /** This Trupp's latest recorded run at the station. */
   ergebnis: StationErgebnis;
@@ -295,15 +345,29 @@ export function stationsRanglisten(
 // API payloads
 // ---------------------------------------------------------------------------
 
-export interface LoginResponse {
-  token: string;
-  leiter: Ausbildungsleiter;
+/** GET /auth/me — the signed-in account, resolved from storage on every call. */
+export interface MeResponse {
+  benutzer: Benutzer;
+  /** The account's Trupp (null without membership). `inviteToken` only for Ausbilder. */
+  trupp: Trupp | null;
 }
 
-export interface TeilnehmerSession {
+/** POST /auth/login, POST /auth/registrieren, POST /trupps/:inviteToken/join. */
+export interface AuthSession extends MeResponse {
   token: string;
-  teilnehmer: Teilnehmer;
-  trupp: Trupp;
+}
+
+/** POST /auth/login — one login for every systemRolle. `name` is case-insensitive. */
+export interface LoginRequest {
+  name: string;
+  password: string;
+}
+
+/** POST /auth/registrieren — creates a `teilnehmer` account without a Trupp. */
+export interface RegistrierenRequest {
+  name: string;
+  password: string;
+  ff?: string | null;
 }
 
 export interface JoinInfo {
@@ -311,16 +375,17 @@ export interface JoinInfo {
   pruefungstermin?: string | null;
 }
 
+/** POST /trupps/:inviteToken/join — new account, already a member of that Trupp. */
 export interface JoinRequest {
   name: string;
   ff: string;
   password: string;
 }
 
-/** Ausbildungsleiter adds a Teilnehmer directly (POST /trupps/:id/teilnehmer). */
+/** Ausbilder creates a new account directly in a Trupp (POST /trupps/:id/teilnehmer). */
 export interface TeilnehmerCreateRequest {
   name: string;
-  ff: string;
+  ff?: string | null;
 }
 
 export interface TeilnehmerCreateResponse {
@@ -329,13 +394,66 @@ export interface TeilnehmerCreateResponse {
   tempPassword: string;
 }
 
-export interface TeilnehmerLoginRequest {
-  name: string;
-  password: string;
+/** Ausbilder attaches an existing account without Trupp (POST /trupps/:id/teilnehmer/zuordnen). */
+export interface TeilnehmerZuordnenRequest {
+  benutzerId: string;
 }
 
 export interface RolleUpdate {
   rolle: Rolle | null;
+}
+
+/** One row of the Benutzerverwaltung (GET /benutzer, GET /benutzer/ohne-trupp). */
+export interface BenutzerUebersicht {
+  id: string;
+  name: string;
+  ff: string | null;
+  systemRolle: SystemRolle;
+  trupp: { id: string; name: string } | null;
+  createdAt: string;
+}
+
+/** PATCH /benutzer/:id/systemrolle */
+export interface SystemRolleUpdate {
+  systemRolle: SystemRolle;
+}
+
+/** POST /benutzer/:id/passwort-zuruecksetzen */
+export interface PasswortResetResponse {
+  /** Plaintext, returned exactly once. */
+  tempPassword: string;
+}
+
+// ---------------------------------------------------------------------------
+// Instanz-Einstellungen (Branding)
+// ---------------------------------------------------------------------------
+
+export const WAPPEN_MAX_BYTES = 2 * 1024 * 1024;
+export const WAPPEN_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;
+export type WappenContentType = (typeof WAPPEN_CONTENT_TYPES)[number];
+
+export interface WappenInfo {
+  /**
+   * API path of the image incl. cache-busting version, relative to the API base like every
+   * other api() path, e.g. "/einstellungen/wappen?v=1759660800000" → fetch/show it as
+   * `${API_BASE}/api${pfad}`.
+   */
+  pfad: string;
+  contentType: WappenContentType;
+  /** ISO datetime of the last upload. */
+  aktualisiertAm: string;
+}
+
+/** GET /einstellungen (public). */
+export interface Einstellungen {
+  fuehrendeFeuerwehr: string | null;
+  /** null = no Wappen uploaded → show nothing. */
+  wappen: WappenInfo | null;
+}
+
+/** PUT /einstellungen — empty string or null clears the name. */
+export interface EinstellungenUpdate {
+  fuehrendeFeuerwehr: string | null;
 }
 
 export interface TerminInput {

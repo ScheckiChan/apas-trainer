@@ -21,8 +21,10 @@ export const config = {
   port: num('PORT', 3001),
   dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
   jwtSecret: jwtSecret || 'dev-insecure-secret-change-me',
-  leiterTokenTtl: process.env.LEITER_TOKEN_TTL ?? '7d',
-  teilnehmerTokenTtl: process.env.TEILNEHMER_TOKEN_TTL ?? '90d',
+  /** Session length for accounts that are Ausbilder at login time (env name kept from the Leiter era). */
+  ausbilderTokenTtl: process.env.LEITER_TOKEN_TTL ?? '7d',
+  /** Session length for Prüfer and Teilnehmer accounts. */
+  benutzerTokenTtl: process.env.TEILNEHMER_TOKEN_TTL ?? '90d',
   /** Comma separated list of allowed CORS origins. Empty = same-origin only (no CORS headers). */
   corsOrigins: (process.env.CORS_ORIGIN ?? '')
     .split(',')

@@ -2,7 +2,7 @@ import { intervalsOverlap, type BuchungsKonflikt, type KalenderPerson, type Term
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { db, type TerminRecord } from '../db.js';
-import { requireAny } from '../lib/auth.js';
+import { isAusbilder, requireAuth } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId } from '../lib/ids.js';
 import { forgetReminders } from '../reminders.js';
@@ -10,7 +10,7 @@ import { toTermin } from '../serialize.js';
 
 /**
  * Mounted at /api/termine. One shared calendar for the whole instance (= one Ausbildung):
- * every Trupp sees the same Termine, and a Termin may assign Teilnehmer of any Trupp.
+ * every account sees the same Termine, and a Termin may assign people of any Trupp (or none).
  */
 export const termineRouter = Router();
 
@@ -58,24 +58,21 @@ async function validateRefs(teilnehmerIds: string[], ressourceId: string | null 
   if (ressourceId && !(await db.ressourcen.get(ressourceId))) {
     throw new HttpError(400, 'Unbekannte Ressource');
   }
-  const known = new Set((await db.teilnehmer.all()).map((t) => t.id));
+  const known = new Set((await db.benutzer.all()).map((b) => b.id));
   const unknown = teilnehmerIds.filter((id) => !known.has(id));
-  if (unknown.length) throw new HttpError(400, 'Unbekannte Teilnehmer ausgewählt', { unknown });
+  if (unknown.length) throw new HttpError(400, 'Unbekannte Personen ausgewählt', { unknown });
 }
-
-const creatorId = (req: Request): string => (req.leiter ? 'ausbildungsleiter' : req.teilnehmer!.sub);
 
 /**
- * Ausbildungsleiter may edit everything; a Teilnehmer only Individualübungen they created,
- * no matter which Trupps the assignees belong to. Single-instance deployment: any
- * Ausbildungsleiter account is "the" Ausbildungsleiter.
+ * Any Ausbilder may edit everything; everyone else (Prüfer, Teilnehmer) only the
+ * Individualübungen they created, no matter which Trupps the assignees belong to.
  */
 function canModify(req: Request, t: TerminRecord): boolean {
-  if (req.leiter) return true;
-  return t.typ === 'individual' && !!req.teilnehmer && t.createdBy === req.teilnehmer.sub;
+  if (isAusbilder(req)) return true;
+  return t.typ === 'individual' && t.createdBy === req.benutzer!.id;
 }
 
-termineRouter.use(requireAny);
+termineRouter.use(requireAuth);
 
 termineRouter.get('/', async (req, res) => {
   const from = typeof req.query.from === 'string' ? new Date(req.query.from).getTime() : -Infinity;
@@ -87,20 +84,30 @@ termineRouter.get('/', async (req, res) => {
   res.json(list.map(toTermin));
 });
 
-/** Everyone who can be assigned to a Termin: the Teilnehmer of all Trupps, labelled with their Trupp. */
+/**
+ * Everyone who can be assigned to a Termin: every account, labelled with its Trupp.
+ * Accounts without a Trupp (fresh registrations, Prüfer, Ausbilder) come last with
+ * truppId/truppName null.
+ */
 termineRouter.get('/personen', async (_req, res) => {
-  const [teilnehmer, trupps] = await Promise.all([db.teilnehmer.all(), db.trupps.all()]);
+  const [benutzer, trupps] = await Promise.all([db.benutzer.all(), db.trupps.all()]);
   const truppName = new Map(trupps.map((t) => [t.id, t.name]));
-  const body: KalenderPerson[] = teilnehmer
-    .map((t) => ({
-      id: t.id,
-      name: t.name,
-      ff: t.ff,
-      rolle: t.rolle ?? null,
-      truppId: t.truppId,
-      truppName: truppName.get(t.truppId) ?? '—',
+  const body: KalenderPerson[] = benutzer
+    .map((b) => ({
+      id: b.id,
+      name: b.name,
+      ff: b.ff,
+      systemRolle: b.systemRolle,
+      rolle: b.truppId ? (b.rolle ?? null) : null,
+      truppId: b.truppId,
+      truppName: b.truppId ? (truppName.get(b.truppId) ?? '—') : null,
     }))
-    .sort((a, b) => a.truppName.localeCompare(b.truppName, 'de') || a.name.localeCompare(b.name, 'de'));
+    .sort(
+      (a, b) =>
+        Number(a.truppName === null) - Number(b.truppName === null) ||
+        (a.truppName ?? '').localeCompare(b.truppName ?? '', 'de') ||
+        a.name.localeCompare(b.name, 'de'),
+    );
   res.json(body);
 });
 
@@ -111,8 +118,8 @@ termineRouter.post('/konflikte', async (req, res) => {
 
 termineRouter.post('/', async (req, res) => {
   const input = parseBody(terminSchema, req);
-  if (input.typ === 'fix' && !req.leiter) {
-    throw new HttpError(403, 'Fixtermine können nur vom Ausbildungsleiter angelegt werden');
+  if (input.typ === 'fix' && !isAusbilder(req)) {
+    throw new HttpError(403, 'Fixtermine können nur von Ausbildern angelegt werden');
   }
   const teilnehmerIds = [...new Set(input.teilnehmerIds)];
   await validateRefs(teilnehmerIds, input.ressourceId);
@@ -125,7 +132,7 @@ termineRouter.post('/', async (req, res) => {
     ende: new Date(input.ende).toISOString(),
     teilnehmerIds,
     ressourceId: input.ressourceId ?? null,
-    createdBy: creatorId(req),
+    createdBy: req.benutzer!.id,
     createdAt: new Date().toISOString(),
   };
   await db.termine.insert(rec);
@@ -142,8 +149,8 @@ termineRouter.put('/:terminId', async (req, res) => {
   if (!canModify(req, existing)) throw new HttpError(403, 'Keine Berechtigung für diesen Termin');
 
   const input = parseBody(terminSchema, req);
-  if (input.typ !== existing.typ && !req.leiter) {
-    throw new HttpError(403, 'Nur der Ausbildungsleiter kann den Termintyp ändern');
+  if (input.typ !== existing.typ && !isAusbilder(req)) {
+    throw new HttpError(403, 'Nur Ausbilder können den Termintyp ändern');
   }
   const teilnehmerIds = [...new Set(input.teilnehmerIds)];
   await validateRefs(teilnehmerIds, input.ressourceId);

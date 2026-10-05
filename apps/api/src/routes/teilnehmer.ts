@@ -1,8 +1,8 @@
 import { ROLLEN } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
-import { db } from '../db.js';
-import { requireAny } from '../lib/auth.js';
+import { db, type MitgliedRecord } from '../db.js';
+import { isAusbilder, requireAuth } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { toTeilnehmer } from '../serialize.js';
 
@@ -12,20 +12,21 @@ export const teilnehmerRouter = Router();
 const rolleSchema = z.object({ rolle: z.enum(ROLLEN).nullable() });
 
 /**
- * Role assignment is a joint decision: the owning Ausbildungsleiter or any Teilnehmer
- * of the same Trupp may change anyone's Rolle. Several Teilnehmer may hold the same
- * Rolle (Ergänzungsteilnehmer), so nothing is blocked here.
+ * APAS-Rolle (GKDT, ATF/ATM1, …) assignment inside a Trupp — unrelated to the systemRolle.
+ * A joint decision: any Ausbilder, or any member of the same Trupp (whatever their
+ * systemRolle), may change anyone's Rolle in it. Several people may hold the same Rolle
+ * (Ergänzungsteilnehmer), so nothing is blocked here.
  */
-teilnehmerRouter.patch('/:teilnehmerId/rolle', requireAny, async (req, res) => {
+teilnehmerRouter.patch('/:teilnehmerId/rolle', requireAuth, async (req, res) => {
   const { rolle } = parseBody(rolleSchema, req);
-  const target = await db.teilnehmer.get(String(req.params.teilnehmerId));
-  const trupp = target ? await db.trupps.get(target.truppId) : undefined;
-  const allowed =
-    !!trupp &&
-    ((!!req.leiter && trupp.ownerId === req.leiter.sub) || req.teilnehmer?.truppId === trupp.id);
-  if (!target || !allowed) throw new HttpError(404, 'Teilnehmer nicht gefunden');
-
-  const updated = await db.teilnehmer.patch(target.id, (t) => ({ ...t, rolle }));
+  const targetId = String(req.params.teilnehmerId);
+  const updated = await db.benutzer.update((items) => {
+    const t = items.find((x) => x.id === targetId);
+    const allowed = !!t?.truppId && (isAusbilder(req) || req.benutzer!.truppId === t.truppId);
+    if (!t || !allowed) return { items, result: undefined };
+    t.rolle = rolle;
+    return { items, result: t as MitgliedRecord };
+  });
   if (!updated) throw new HttpError(404, 'Teilnehmer nicht gefunden');
   res.json(toTeilnehmer(updated));
 });

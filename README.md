@@ -5,18 +5,23 @@ Standalone PWA for organising one cross-fire-brigade (FF-übergreifend) training
 deployed once per Ausbildung; the training consists of one or more **Trupps** (4-person
 Atemschutztrupps with the roles GKDT, ATF/ATM1, ATM2 and Wassertruppführer).
 
-- **Ausbildungsleiter** log in with e-mail + password and land on the Trupp-Liste. They
-  create the Trupps, assign the Rollen, add Teilnehmer or share a Trupp's invite link /
-  QR code, track every Teilnehmer's checklist (Ampel), set the Prüfungstermin, manage
-  the shared Ressourcen and schedule Fixtermine in the shared calendar.
-- **Teilnehmer** open the invite link and either *join* (Name, FF, Passwort) or *sign in*
-  again (Name + Passwort) — no e-mail involved. Roles are assigned afterwards, inside the
-  Trupp, by anyone in it. Teilnehmer see and toggle their own checklist, see the whole
-  Trupp and its role coverage, browse the Stationskarten and use the calendar that all
-  Trupps of the Ausbildung share (incl. creating Individualübungen with people from any
-  Trupp and booking Ressourcen).
-- Push reminders go out N hours before each Termin to its assigned Teilnehmer and the
-  Ausbildungsleiter.
+- Everyone has **one account** (Name + Passwort, no e-mail) and signs in on the same
+  login. Accounts come from self-registration (`/registrieren`), a Trupp's invite link, or
+  an Ausbilder's "Person hinzufügen". Each account has a **systemRolle**:
+  - **Ausbilder** create the Trupps, add people (new or already registered) or share a
+    Trupp's invite link / QR code, assign the APAS-Rollen, track every checklist (Ampel),
+    set the Prüfungstermin, manage the shared Ressourcen and Fixtermine, and use the
+    **Benutzerverwaltung** (change anyone's systemRolle, instance branding).
+  - **Prüfer** run and score stations live: Stoppuhr and "Ergebnis speichern" for any Trupp.
+  - **Teilnehmer** (default for every new account) see and toggle their own checklist, see
+    their Trupp and its role coverage, browse the Stationskarten, save station results for
+    their own Trupp, and use the shared calendar (incl. creating Individualübungen with
+    people from any Trupp and booking Ressourcen).
+- The **APAS-Rolle** (GKDT, ATF/ATM1, ATM2, Wassertruppführer) is a separate thing: the
+  position a person holds inside their Trupp, assigned there by any Ausbilder or anyone in
+  the Trupp.
+- Push reminders go out N hours before each Termin to its assigned people and every
+  Ausbilder.
 
 ## Repository layout
 
@@ -24,9 +29,12 @@ Atemschutztrupps with the roles GKDT, ATF/ATM1, ATM2 and Wassertruppführer).
 apps/
   api/            Express 5 + TypeScript API, file-based JSON storage
     src/
-      routes/     auth, join (invite-link join/login), trupps (+teilnehmer),
-                  teilnehmer (Rolle), termine, ressourcen, ergebnisse, push
-      lib/        store (JSON collections + mutex), auth (JWT middleware), password (bcrypt)
+      routes/     auth (login, registrieren, me), join (invite link), trupps (+Mitglieder),
+                  teilnehmer (APAS-Rolle), benutzer (Benutzerverwaltung),
+                  einstellungen (Branding + Wappen), termine, ressourcen, ergebnisse, push
+      lib/        store (JSON collections + mutex), auth (JWT + systemRolle middleware),
+                  benutzer (name rules, account factory), password (bcrypt)
+      migrate.ts  idempotent startup migrations
       push.ts     web-push wrapper (VAPID, subscriptions)
       reminders.ts  setInterval reminder loop
       scripts/    seedAdmin.ts, generateVapid.ts
@@ -50,12 +58,13 @@ Requirements: Node.js ≥ 22.12, npm ≥ 10.
 ```bash
 npm install          # installs all workspaces and builds packages/shared
 cp .env.example .env # optional for dev — sensible defaults are built in
-npm run seed-admin   # create the first Ausbildungsleiter (see "First run")
+npm run seed-admin   # create the first Ausbilder (see "First run")
 npm run dev          # API on :3001, web on http://localhost:5173 (proxies /api)
 ```
 
-- To try the Teilnehmer side, copy a Trupp's invite link from TruppDetail into a private
-  window and use "Neu beitreten". Coming back later works on the same link via "Anmelden".
+- To try the Teilnehmer side, register at `/registrieren` in a private window (or open a
+  Trupp's invite link from TruppDetail and use "Neu beitreten"). Coming back later is the
+  normal login with name + password.
 - The service worker is only registered in production builds, so it never
   interferes with Vite's dev server. Use `npm run build && npm run preview -w @apas/web`
   (with the API running) to test the installable PWA locally.
@@ -67,22 +76,27 @@ Other root scripts:
 | `npm run typecheck`      | `tsc --noEmit` in shared, api and web                      |
 | `npm run build`          | builds shared → api (`dist/`) → web (`dist/`)              |
 | `npm start`              | runs the built API (`apps/api/dist/index.js`)              |
-| `npm run seed-admin`     | create an Ausbildungsleiter / reset their password         |
+| `npm run seed-admin`     | create an Ausbilder / reset a password (+ make Ausbilder)  |
 | `npm run generate-vapid` | print a fresh VAPID key pair for `.env`                    |
 | `npm run generate-icons` | regenerate the placeholder PWA icons                       |
 
-## First run — creating the Ausbildungsleiter account
+## First run — creating the first Ausbilder account
 
-There is no public sign-up. Create the account(s) with:
+Anyone can self-register, but only as Teilnehmer. The first Ausbilder is created with:
 
 ```bash
 npm run seed-admin
-# E-Mail des Ausbildungsleiters: kommandant@ff-beispiel.at
+# Anmeldename des Ausbilders: Max Muster
 # Passwort (min. 10 Zeichen): ********
 ```
 
-Running it again with an existing e-mail resets that account's password.
-Non-interactive: `ADMIN_EMAIL=… ADMIN_PASSWORD=… npm run seed-admin`.
+Further Ausbilder are best promoted in the Benutzerverwaltung. Running the script again
+with an existing name (case-insensitive) resets that account's password **and makes it
+Ausbilder**, which is also the way back in if every Ausbilder password is lost.
+Non-interactive: `ADMIN_NAME=… ADMIN_PASSWORD=… npm run seed-admin` (`ADMIN_EMAIL` is
+still accepted as an alias, since migrated Ausbildungsleiter accounts log in with their
+former e-mail address as name). The script runs the data migrations first, so it is safe
+on an old data directory.
 
 In Docker:
 
@@ -102,8 +116,8 @@ All configuration is read by the API from the environment. In dev, `npm run dev`
 | `PORT`                      | `3001`                       | API port                                                           |
 | `DATA_DIR`                  | `./data`                     | JSON files live here (`/data` volume in Docker)                    |
 | `JWT_SECRET`                | dev fallback                 | **Required in production** (`openssl rand -base64 48`)             |
-| `LEITER_TOKEN_TTL`          | `7d`                         | Ausbildungsleiter session length                                   |
-| `TEILNEHMER_TOKEN_TTL`      | `90d`                        | Teilnehmer session length                                          |
+| `LEITER_TOKEN_TTL`          | `7d`                         | Session length of accounts that are Ausbilder at login             |
+| `TEILNEHMER_TOKEN_TTL`      | `90d`                        | Session length of Prüfer and Teilnehmer accounts                   |
 | `CORS_ORIGIN`               | _(empty)_                    | Only needed if web and API are served from different origins       |
 | `TRUST_PROXY`               | `1` in production            | Express `trust proxy` (correct client IPs for rate limiting)       |
 | `VAPID_PUBLIC_KEY`          | _(empty)_                    | Push is disabled while empty                                       |
@@ -158,42 +172,61 @@ docker compose exec api node dist/scripts/seedAdmin.js
 Put your TLS-terminating reverse proxy in front of **web** only. Both Dockerfiles use the
 repo root as build context.
 
-**Backups:** everything lives in the `DATA_DIR` JSON files
-(`ausbildungsleiter.json`, `trupps.json`, `teilnehmer.json`, `ressourcen.json`,
-`termine.json`, `ergebnisse.json`, `pushsubscriptions.json`, `reminders.json`). A leftover `magiclinks.json`
-from before the password switch is no longer read and can be deleted.
-Copying the volume is a complete backup.
+**Backups:** everything lives in `DATA_DIR`: the JSON files (`benutzer.json`,
+`trupps.json`, `ressourcen.json`, `termine.json`, `ergebnisse.json`,
+`einstellungen.json`, `pushsubscriptions.json`, `reminders.json`) plus the uploaded
+Wappen (`wappen-<timestamp>.<ext>`, at most one). Copying the volume is a complete backup.
+`ausbildungsleiter.json.migriert` / `teilnehmer.json.migriert` are the pre-migration
+originals (see **Migration to unified accounts**), and a leftover `magiclinks.json` from
+before the password switch is not read either; all of them can be deleted once you're
+happy with the migration.
 
 ## API overview
 
-All endpoints are under `/api`. Auth is `Authorization: Bearer <jwt>`.
+All endpoints are under `/api`. Auth is `Authorization: Bearer <jwt>` (one token kind for
+every account). "signed in" = any account; roles are the account's **current**
+systemRolle, read from storage on every request. Types are in `packages/shared`.
 
-| Method & path                                              | Auth                          |
-| ---------------------------------------------------------- | ----------------------------- |
-| `POST /auth/leiter/login`                                  | public                        |
-| `GET  /auth/leiter/me`                                     | Leiter                        |
-| `GET  /auth/teilnehmer/me`                                 | Teilnehmer                    |
-| `GET /trupps/:inviteToken/join` (Trupp name + date)        | public                        |
-| `POST /trupps/:inviteToken/join` {name, ff, password} → JWT | public                        |
-| `POST /trupps/:inviteToken/login` {name, password} → JWT   | public                        |
-| `PATCH /teilnehmer/:tid/rolle` {rolle \| null}             | owner or any member           |
-| `GET/POST /trupps`                                         | Leiter                        |
-| `GET /trupps/:id` · `PATCH /trupps/:id`                    | member / owner                |
-| `POST /trupps/:id/invite/regenerate`                       | owner                         |
-| `GET /trupps/:id/teilnehmer`                               | member / owner                |
-| `POST /trupps/:id/teilnehmer` {name, ff} → {teilnehmer, tempPassword} | owner                         |
-| `PATCH /trupps/:id/teilnehmer/:tid/checkliste`             | owner or that Teilnehmer      |
-| `DELETE /trupps/:id/teilnehmer/:tid`                       | owner                         |
-| `GET /ressourcen` · `POST` · `DELETE /:rid`                | any signed-in (read) / Leiter (write) |
-| `GET /termine?from&to` · `POST`                            | any signed-in (Fixtermin: Leiter) |
-| `PUT/DELETE /termine/:terminId`                            | Leiter, or creator of an Individualübung |
-| `POST /termine/konflikte` {ressourceId, start, ende, excludeTerminId?} | any signed-in       |
-| `GET /termine/personen` (Teilnehmer of all Trupps + Trupp name) | any signed-in            |
-| `GET /trupps/:id/ergebnisse`                               | member / owner                |
-| `PUT /trupps/:id/ergebnisse/:stationId` {zeitSekunden, fehlerpunkte, teile?} | owner                         |
-| `GET /rangliste` (one leaderboard per station)             | any signed-in user            |
-| `GET /push/vapid-public-key` · `POST /push/subscribe` · `POST /push/unsubscribe` | public / any                  |
-| `GET /health`                                              | public                        |
+| Method & path                                                    | Auth                                   |
+| ---------------------------------------------------------------- | -------------------------------------- |
+| `POST /auth/login` {name, password} → `AuthSession`              | public (rate-limited)                  |
+| `POST /auth/registrieren` {name, password, ff?} → `AuthSession`  | public (rate-limited); new Teilnehmer without Trupp |
+| `GET  /auth/me` → `MeResponse`                                   | signed in                              |
+| `GET /trupps/:inviteToken/join` (Trupp name + date)              | public                                 |
+| `POST /trupps/:inviteToken/join` {name, ff, password} → `AuthSession` | public (rate-limited); new account in that Trupp |
+| `POST /trupps/:inviteToken/beitreten` → `MeResponse`             | signed in, account without Trupp (rate-limited) |
+| `GET /trupps` → `TruppSummary[]`                                 | Ausbilder (with invite) · Prüfer (without) |
+| `POST /trupps` · `PATCH /trupps/:id` · `POST /trupps/:id/invite/regenerate` | Ausbilder                   |
+| `GET /trupps/:id`                                                | Ausbilder · Prüfer · member            |
+| `GET /trupps/:id/teilnehmer` → `Teilnehmer[]`                    | Ausbilder · member                     |
+| `POST /trupps/:id/teilnehmer` {name, ff?} → {teilnehmer, tempPassword} | Ausbilder                        |
+| `POST /trupps/:id/teilnehmer/zuordnen` {benutzerId} → `Teilnehmer` | Ausbilder                            |
+| `PATCH /trupps/:id/teilnehmer/:tid/checkliste`                   | Ausbilder or that person               |
+| `DELETE /trupps/:id/teilnehmer/:tid` (removes from Trupp, keeps account) | Ausbilder                      |
+| `PATCH /teilnehmer/:tid/rolle` {rolle \| null} (APAS-Rolle)     | Ausbilder or any member of that Trupp  |
+| `GET /benutzer` · `GET /benutzer/ohne-trupp` → `BenutzerUebersicht[]` | Ausbilder                         |
+| `PATCH /benutzer/:id/systemrolle` {systemRolle}                  | Ausbilder (409 for the last Ausbilder) |
+| `POST /benutzer/:id/passwort-zuruecksetzen` → {tempPassword}     | Ausbilder                              |
+| `DELETE /benutzer/:id`                                           | Ausbilder (not self, not the last Ausbilder) |
+| `GET /einstellungen` → `Einstellungen`                           | public                                 |
+| `PUT /einstellungen` {fuehrendeFeuerwehr}                        | Ausbilder                              |
+| `PUT /einstellungen/wappen` (raw image body, ≤ 2 MB) · `DELETE /einstellungen/wappen` | Ausbilder         |
+| `GET /einstellungen/wappen?v=…` (the image)                      | public                                 |
+| `GET /ressourcen` · `POST` · `DELETE /:rid`                      | signed in (read) / Ausbilder (write)   |
+| `GET /termine?from&to` · `POST`                                  | signed in (Fixtermin: Ausbilder)       |
+| `PUT/DELETE /termine/:terminId`                                  | Ausbilder, or creator of an Individualübung |
+| `POST /termine/konflikte` {ressourceId, start, ende, excludeTerminId?} | signed in                        |
+| `GET /termine/personen` (every account + Trupp name)             | signed in                              |
+| `GET /trupps/:id/ergebnisse`                                     | Ausbilder · Prüfer · member            |
+| `PUT /trupps/:id/ergebnisse/:stationId` {zeitSekunden, fehlerpunkte, teile?} | Ausbilder · Prüfer: any Trupp; Teilnehmer: own Trupp (else 403) |
+| `GET /rangliste` (one leaderboard per station)                   | signed in                              |
+| `GET /push/vapid-public-key` · `POST /push/subscribe` · `POST /push/unsubscribe` | public / signed in     |
+| `GET /health`                                                    | public                                 |
+
+Errors are `{ error, details? }` with a German message: `401` = not signed in / session
+invalid (sign in again), `403` = signed in but the systemRolle doesn't allow it, `404`
+also for Trupps the caller may not see, `409` = name taken / last Ausbilder / already in
+another Trupp, `413`/`415` = Wappen too large / not an allowed image.
 
 ## PWA notes
 
@@ -221,12 +254,12 @@ Things SPEC.md left open and how they were resolved:
   "Neuen Trupp erstellen" stay. Each Trupp keeps its own invite link, Prüfungstermin
   and Stationsergebnisse. The **calendar and the Ressourcen belong to the instance**,
   not to a Trupp (1 instance : N Trupps) — see **Termine & calendar**.
-- After login the Ausbildungsleiter lands on `/trupps`, a plain list of the Trupps
+- After login an Ausbilder lands on `/trupps`, a plain list of the Trupps
   (sorted by Prüfungstermin). Each row shows the name, "x/4 Rollen besetzt" (red while
   incomplete), the Teilnehmer and "bereit" counts and the Prüfungstermin countdown, and
   opens the Trupp-Details. "+ Neuen Trupp erstellen" is a small secondary button below
   the list. Only when no Trupp exists yet is the create form shown directly.
-- The Ausbildungsleiter creates the Trupps and does the Rollen-Zuweisung (Trupp-Details:
+- Ausbilder create the Trupps and do the Rollen-Zuweisung (Trupp-Details:
   "+ Person hinzufügen" and the Rolle dropdown per row). Teilnehmer can still adjust
   Rollen in their "Trupp" tab, unchanged from before (see **Rollen**).
 - Existing data is migrated on API start (`src/migrate.ts`, idempotent):
@@ -303,12 +336,15 @@ Things SPEC.md left open and how they were resolved:
   by the Stoppuhr and can't be ticked by hand. The Gesamt-Fehlerpunkte (checklist +
   time) are shown against the station's own limit as "bestanden / nicht bestanden" for
   this station in isolation; Station 4 passes only if both Teile are within 5 and 6.
-- Practising needs no account action: anyone (Teilnehmer, Leiter, or the public
-  `/stationen` pages) can use the clock and checklist locally; nothing is stored.
-  **"Ergebnis speichern"** appears only for the Ausbildungsleiter on the Trupp-scoped
-  route `/trupps/:id/stationen/:stationId`, i.e. when it's clear which Trupp ran. Saving
-  stops the clocks so the stored time is what is on screen, and the confirmation links
-  to the Rangliste.
+- Practising needs no account action: anyone (any account, or the public `/stationen`
+  pages) can use the clock and checklist locally; nothing is stored.
+  **"Ergebnis speichern"** is deliberately permissive, for live-training gamification:
+  every signed-in account may save, **Ausbilder and Prüfer for any Trupp, a Teilnehmer
+  only for their own Trupp** (`403` otherwise). The rule is `kannErgebnisSpeichern()` in
+  `packages/shared`, used by the API and the web app alike. It is only offered on a
+  Trupp-scoped station page, i.e. when it's clear which Trupp ran. Saving stops the clocks
+  so the stored time is what is on screen, and the confirmation links to the Rangliste.
+  The record keeps who saved it (`aufgenommenVon`, server-side only).
 - **Storage: latest result only.** `ergebnisse.json` holds at most one record per
   (Trupp, Station), id `truppId:stationId`; saving again overwrites it. It's a live
   tool, not an archive. The record has `zeitSekunden`, `fehlerpunkte`, `teile` (per-Teil
@@ -321,8 +357,7 @@ Things SPEC.md left open and how they were resolved:
   roles, plus a button in Trupp-Details). It is light gamification during live
   training: Trupps compare their times **per station** ("wer war beim Ausrüsten am
   schnellsten?"), not one combined ranking. It covers **every Trupp of the deployment**
-  (one Ausbildung per deployment) and is visible to any signed-in Ausbildungsleiter or
-  Teilnehmer. `GET /api/rangliste` returns one list per station in station order
+  (one Ausbildung per deployment) and is visible to any signed-in account. `GET /api/rangliste` returns one list per station in station order
   (`stationsRanglisten()` in shared):
   - A station's list holds only the Trupps with a recorded result for it. There is no
     "offen" placeholder.
@@ -341,8 +376,8 @@ Things SPEC.md left open and how they were resolved:
   720 px, so nothing scrolls sideways on a phone. Each segment shows how many Trupps have
   a result. The choice is kept in `?station=`, and "Zur Rangliste" after saving a result
   opens the station just run. The page refreshes itself every 30 s while visible. A
-  Teilnehmer's own Trupp is marked "euer Trupp". An Ausbildungsleiter usually owns every
-  Trupp, so the marker is not shown for them.
+  account's own Trupp is marked "euer Trupp" (`eigen`); accounts without a Trupp see no
+  marker.
 - There is no delete for a result (re-saving replaces it) and no history. Removing a
   Trupp isn't supported anywhere yet, so orphaned results can't occur.
 
@@ -351,75 +386,167 @@ Things SPEC.md left open and how they were resolved:
   available on the build machine, so those parts follow a conventional
   multi-stage / web-push layout. Align them with FWMS later if they differ.
 
+**Benutzer & Rollen (systemRolle vs. APAS-Rolle)**
+- **One account type** (`benutzer.json`): a global identity (name, bcrypt hash, optional
+  FF) with a **systemRolle**, plus an optional Trupp membership (`truppId`) and, inside
+  that Trupp, an optional **APAS-Rolle** (`rolle`). The former Ausbildungsleiter and
+  per-Trupp Teilnehmer records are gone; every path that creates people creates this one
+  type.
+- **systemRolle** (`ausbilder` / `pruefer` / `teilnehmer`, `SYSTEM_ROLLEN` in shared) says
+  what an account may do in the app. **APAS-Rolle** (`GKDT` / `ATF_ATM1` / `ATM2` /
+  `WASSERTRUPPFUEHRER`, `ROLLEN`) is the exam position inside a Trupp. They are
+  independent fields with independent endpoints (`PATCH /benutzer/:id/systemrolle` vs.
+  `PATCH /teilnehmer/:id/rolle`) and are never derived from each other. A Teilnehmer
+  account can hold any APAS-Rolle; an Ausbilder or Prüfer keeps a Trupp membership and
+  APAS-Rolle if they had one before being promoted.
+- What each systemRolle may do:
+  - **Ausbilder**: everything the old single Ausbildungsleiter could, for **all** Trupps
+    (there is no per-Trupp ownership any more; `Trupp.ownerId` only records who created
+    it): Trupps, invite links, Person hinzufügen, APAS-Rollen, every Checkliste, Kalender
+    (Fixtermine, all Termine), Ressourcen, Benutzerverwaltung, Branding.
+  - **Prüfer**: Stoppuhr + "Ergebnis speichern" for any Trupp. For that they can read the
+    Trupp list (`GET /trupps`, without invite tokens), any Trupp record and its
+    Ergebnisse. They **cannot** read other Trupps' member lists: those carry the
+    Checklisten (Tauglichkeit is health data) and aren't needed to score a station. No
+    Trupp, Kalender or Ressourcen management, no Benutzerverwaltung.
+  - **Teilnehmer**: their own Trupp (record, members, Ergebnisse), their own Checkliste,
+    APAS-Rollen in their Trupp, Ergebnis speichern for their own Trupp,
+    Individualübungen. Other Trupps answer `404`, as before.
+  - Everyone signed in: Kalender (read, Individualübungen), Ressourcen (read), Rangliste,
+    Stationen.
+- **Registration**: `/registrieren` (`POST /auth/registrieren`, name + password, FF
+  optional) creates a `teilnehmer` without a Trupp and signs in right away. Every new
+  account starts as `teilnehmer`, also via invite link or Person hinzufügen; only
+  `seed-admin` and the Benutzerverwaltung make Ausbilder or Prüfer.
+- **Invite link and registration are unified**: both create the same account type. The
+  invite link (`POST /trupps/:token/join`, name + FF + password) additionally sets the
+  Trupp membership. An already registered account without a Trupp can join via the link
+  while signed in (`POST /trupps/:token/beitreten`); an account already in another Trupp
+  gets a `409` and has to be moved by an Ausbilder (remove + attach).
+- **Person hinzufügen** (Ausbilder, TruppDetail) has two modes: create a new account with
+  a generated one-time password (as before: 11 characters from an alphabet without
+  look-alikes, about 64 bit, returned once, never stored or logged), or attach an existing
+  account without Trupp, picked from `GET /benutzer/ohne-trupp` (every account without a
+  Trupp, any systemRolle, labelled with it).
+- **Removing someone from a Trupp keeps the account** (and its Checkliste, Termine and
+  push subscriptions); only membership and APAS-Rolle are cleared, so they can be attached
+  elsewhere. Deleting an account is a separate Benutzerverwaltung action
+  (`DELETE /benutzer/:id`) that also removes it from every Termin and drops its push
+  subscriptions. Saved Ergebnisse belong to the Trupp and stay.
+- **Benutzerverwaltung** (`/benutzer`, Ausbilder only): every account with name, FF,
+  systemRolle and Trupp; the systemRolle can be changed per row. **Guardrail:** demoting
+  (or deleting) the **last** Ausbilder is refused with `409` ("Es muss mindestens ein
+  Ausbilder bestehen bleiben …"), whether it's yourself or someone else. The check runs
+  inside the collection's write lock, so two concurrent demotions can't both pass. With a
+  second Ausbilder it is allowed, including demoting yourself. Nobody can delete their
+  own account. "Passwort zurücksetzen" (new one-time password) replaces the old "remove
+  and re-add" workaround, now that removing keeps the account. If every Ausbilder
+  password is lost, `npm run seed-admin` with an existing name resets it and makes that
+  account Ausbilder.
+
 **Auth & sessions**
-- Tokens are sent as `Authorization: Bearer` headers and stored in `localStorage`
-  (no cookies → no CSRF handling needed). The two token types are separate in every
-  way: different `kind` claim (`leiter` / `teilnehmer`), different JWT audience,
-  different payload (`email` vs `truppId`), separate middleware (`requireLeiter`,
-  `requireTeilnehmer`, `requireAny`), and separate `localStorage` keys, so one device
-  can hold both sessions without them leaking into each other.
-- Session lengths: Ausbildungsleiter 7 days, Teilnehmer 90 days (logging in again on a
-  phone at the Übung should be rare). Both configurable.
-- Teilnehmer join and log in with a **password** on the Trupp's invite link
-  (`/join/:token`, tabs "Neu beitreten" / "Anmelden"). There is no e-mail at all: no
-  address is collected, nothing is sent, and there is no SMTP dependency. Joining
-  logs in immediately.
-- Identity is **(Trupp, Name) + Passwort**, not a global username, so two Trupps can
-  each have a "Max". Names are unique within a Trupp, compared trimmed,
-  whitespace-collapsed and case-insensitive ("max  muster" = "Max Muster"). A second
-  join with a taken name gets a `409` that tells the person to use "Anmelden" (or to
-  add an initial). Wrong name and wrong password give the same `401` error. Unknown
-  names still run a bcrypt compare, so timing doesn't reveal which names exist.
-- Passwords: at least 8 characters for Teilnehmer (10 for Ausbildungsleiter via the
-  seed script), at most 72 (bcrypt's input limit, so input is rejected rather than
-  silently truncated). Both use the same bcrypt cost, 12 (`lib/password.ts`).
-- Login is tied to the invite token. After "Neu erzeugen" of the invite link,
-  Teilnehmer need the new link to log in again (existing sessions keep working).
-  The browser remembers the last used invite link, and the Login page offers a
-  shortcut back to it.
-- **Manual add by the Ausbildungsleiter** (TruppDetail → "+ Person hinzufügen", Name +
-  FF), e.g. to pre-populate a Trupp before the first Übung. This is a second path next
-  to the invite link, which stays the normal way in. `POST /trupps/:id/teilnehmer`
-  creates the record exactly like a self-join (bcrypt, `rolle: null`, same name
-  normalisation, same `409` shape for a taken name) with a generated password: 11
-  characters from an alphabet without look-alikes (no 0/O/o, 1/l/I), about 64 bit. The
-  plaintext is returned once in the response, shown once in a dismissable box with a
-  copy button, and never stored or logged. The person logs in on the invite link under
-  "Anmelden" with name + that password.
-- The generated password stays valid; there is no "change password" flow (out of scope,
-  same as reset). If it gets lost before being passed on, remove the person and add
-  them again, which takes seconds while they have no data yet.
-- There is no password reset for Teilnehmer. If someone forgets theirs, the
-  Ausbildungsleiter removes them in TruppDetail and they join again. This loses their
-  checklist ticks and Termin assignments, which is acceptable at this scale.
-- Migration: Teilnehmer created under the old magic-link flow have no password. Login
-  tells them to use "Neu beitreten" once with exactly the same name. That **claims**
-  the existing record (sets the password, keeps id, Rolle, checklist and Termine) and
-  drops the stored e-mail. Their old sessions remain valid until they expire.
-- A Teilnehmer record belongs to exactly one Trupp. The same person in two Trupps
-  has two accounts; the browser holds one Teilnehmer session at a time (the most
-  recent login).
-- No sign-up endpoint exists. Ausbildungsleiter accounts are created only via
-  `npm run seed-admin`.
-- Rate limits: 300 req/min per IP on the whole API. Password logins (Ausbildungsleiter
-  and Teilnehmer) allow 20 **failed** attempts per 15 min per IP. Successful logins
-  don't count, so a whole Trupp behind one NAT can still sign in. Join allows 30
-  attempts per 15 min per IP, and every attempt counts because it creates accounts.
+- **One login for every role**: `POST /auth/login` with name + password, at `/login`.
+  Two entry points would have been barely simpler to build and would have kept the
+  identity split this change removes. The invite token is no longer part of logging in;
+  regenerating an invite link only affects joining.
+- **Login identifier = the name, unique instance-wide**, compared trimmed,
+  whitespace-collapsed and case-insensitive ("max  muster" = "Max Muster"). Before, names
+  were only unique per Trupp. A taken name gets a `409` that suggests signing in or adding
+  an initial. Wrong name and wrong password give the same `401`. Unknown names still run a
+  bcrypt compare, so timing doesn't reveal which names exist.
+- **Token**: a JWT (audience `apas:benutzer`) with the claims
+  `{ kind: 'benutzer', sub: <Benutzer id>, systemRolle, iat, exp, aud }`. Only `sub` is
+  trusted: every request loads the account from `benutzer.json` and uses its current
+  systemRolle and Trupp, so role changes, Trupp moves and deletions take effect on the
+  next request without re-login (a deleted account gets `401`). The `systemRolle` claim
+  only records the role at login. Clients read role and Trupp from `GET /auth/me`
+  (`MeResponse`), not from the token.
+- Tokens are sent as `Authorization: Bearer` headers and stored in `localStorage` (no
+  cookies → no CSRF handling needed). One token per device.
+- Session length is chosen at login: accounts that are Ausbilder at that moment get
+  `LEITER_TOKEN_TTL` (7 days), Prüfer and Teilnehmer `TEILNEHMER_TOKEN_TTL` (90 days —
+  logging in again on a phone at the Übung should be rare).
+- **Old tokens keep working**: tokens issued before the change (audiences `apas:leiter`
+  / `apas:teilnehmer`) are accepted until they expire, because the migration kept every
+  id, so their `sub` resolves to the same account (with its current role). Anything that
+  doesn't resolve gets a clean `401` and the client signs in again.
+- Passwords: at least 8 characters (10 for Ausbilder created via the seed script), at
+  most 72 (bcrypt's input limit, so input is rejected rather than silently truncated).
+  Same bcrypt cost, 12, everywhere (`lib/password.ts`). There is no self-service
+  password change or reset (no e-mail); an Ausbilder resets it in the
+  Benutzerverwaltung.
+- Legacy records from the magic-link era have no password. Login tells them to use "Neu
+  beitreten" once on their Trupp's invite link with exactly the same name. That
+  **claims** the existing record (sets the password, keeps id, Rolle, checklist and
+  Termine).
+- Rate limits: 300 req/min per IP on the whole API. Login allows 20 **failed** attempts
+  per 15 min per IP (successful logins don't count, so a whole Trupp behind one NAT can
+  still sign in). Registration, invite-link join and "beitreten" share a budget of 30
+  attempts per 15 min per IP, and every attempt counts because they create or change
+  accounts.
+
+**Migration to unified accounts** (`migrateBenutzer` in `src/migrate.ts`)
+- Runs at API start (after the Gruppe→Trupp and shared-calendar steps) and at the start
+  of `npm run seed-admin`. Idempotent: records already in `benutzer.json` (by id) are
+  skipped, and afterwards `ausbildungsleiter.json` / `teilnehmer.json` are renamed to
+  `*.migriert` (kept as a backup, never read again, so a deleted account is never
+  re-imported).
+- **Ids are kept**, so Termin assignments, Ergebnisse (`aufgenommenVon`), push
+  subscriptions and issued tokens keep pointing at the same person. Push subscription
+  owners are rewritten from `leiter`/`teilnehmer` to `benutzer`.
+- Ausbildungsleiter → **Ausbilder**, password hash kept. Its login name is its **former
+  e-mail address** (e.g. `kommandant@ff-beispiel.at`), so the person signs in with
+  exactly what they typed before, just in the "Name" field.
+- Teilnehmer → **teilnehmer** with Trupp membership, APAS-Rolle, Checkliste, FF and
+  password hash unchanged (names get their whitespace collapsed).
+- **Name collisions** (names were only unique per Trupp before) are resolved
+  deterministically: Ausbildungsleiter first (by `createdAt`, then id), then Teilnehmer
+  (by `joinedAt`, then id). The first keeps the name; a later one becomes
+  "Name (Truppname)", and if that is taken too, "Name (Truppname) 2", "… 3". Every
+  rename is logged (`[migrate] Anmeldename „…" doppelt → „…"`) and visible in the
+  Benutzerverwaltung, so the Ausbilder can tell those people their new login name.
+- Termine created by the old Leiter keep `createdBy: 'ausbildungsleiter'` (every
+  Ausbilder may edit them anyway); new Termine store the creator's account id.
+
+**Branding: führende Feuerwehr + Wappen**
+- One instance-wide setting (`einstellungen.json`, single record): the name of the
+  führende Feuerwehr and an optional Wappen. `GET /einstellungen` is **public**, because
+  it is shown on the pre-login pages too; changing it is Ausbilder-only.
+- Upload is `PUT /einstellungen/wappen` with the **raw image as the request body**
+  (`express.raw`, limit 2 MB → `413`), so no multipart parser and no extra dependency.
+  The type is decided by **sniffing the bytes**, never by the client's Content-Type:
+  PNG / JPEG / WebP by magic bytes; SVG only if it is valid UTF-8 whose root element
+  (after an optional XML declaration, comments and an SVG doctype) is `<svg …>` and that
+  contains no `<!ENTITY` declarations. Anything else → `415` "Nur PNG-, JPG-, WebP- oder
+  SVG-Bilder sind als Wappen erlaubt".
+- Stored next to the JSON files as `DATA_DIR/wappen-<timestamp>.<ext>`: the new file is
+  written atomically first, then the record points at it, then the old file is removed.
+  `DELETE /einstellungen/wappen` removes both.
+- Served by `GET /einstellungen/wappen` with the stored Content-Type and
+  `X-Content-Type-Options: nosniff`. SVGs also get
+  `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'`, so even
+  opening an uploaded SVG directly can't run script or load anything (inside an `<img>`
+  browsers never run SVG script anyway). SVGs are not sanitised; the CSP is the guard.
+- Cache busting: `Einstellungen.wappen.pfad` is `/einstellungen/wappen?v=<upload time in
+  ms>`. With the current `v` the image is cached for a year (`immutable`); without `v` or
+  with a stale one, `no-cache`. A new upload changes `v`.
+- The nginx in front of the API must accept 2 MB request bodies
+  (`client_max_body_size`); nginx's default is 1 MB.
 
 **Rollen**
 - Rolle is **not** chosen at join. New Teilnehmer start with `rolle: null` ("keine
   Rolle"), and the Rolle is assigned later with `PATCH /teilnehmer/:id/rolle`.
-- Anyone in the Trupp may change **anyone's** Rolle at any time: the owning
-  Ausbildungsleiter (dropdown per row in TruppDetail) and every Teilnehmer (tab
-  "Trupp" in the Teilnehmer view). Role shuffling before the exam is a joint
-  decision. Checklists stay restricted (own checklist, or the Ausbildungsleiter).
+- Anyone in the Trupp may change **anyone's** APAS-Rolle in it at any time: every
+  Ausbilder (dropdown per row in TruppDetail) and every member of that Trupp, whatever
+  their systemRolle (tab "Trupp" in the Teilnehmer view). Role shuffling before the exam
+  is a joint decision. Checklists stay restricted (own checklist, or an Ausbilder).
 - Duplicate roles are allowed (Ergänzungsteilnehmer in Trupps with more than 4
   people). Both views show the coverage as "x/4 Rollen besetzt" with one chip per
   Rolle (×n when held more than once), but nothing is blocked.
 
 **Data model**
-- The Checkliste is embedded in the Teilnehmer record. The Teilnehmer and the owning
-  Ausbildungsleiter can both toggle it. The Tauglichkeit exemption follows whoever
+- The Checkliste is embedded in the account record (it describes the person, so it
+  survives moving between Trupps). The person and any Ausbilder can toggle it. The Tauglichkeit exemption follows whoever
   **currently** holds GKDT: for them `tauglichkeit` is shown as greyed "N/A", the API
   ignores changes to it, and the Ampel doesn't count it. The stored value is kept, so
   it comes back unchanged if the Rolle moves on. Without a Rolle, all three items are
@@ -432,11 +559,12 @@ Things SPEC.md left open and how they were resolved:
 - `Trupp.stufe` exists and is always `'BRONZE'`. It is the cheap hook for
   Silber/Gold later; nothing else is generalised.
 - Ressourcen are instance-wide (no `truppId`): the Trupps of one Ausbildung share the
-  same vehicle, Übungsgelände etc. Only the Ausbildungsleiter creates or deletes them
+  same vehicle, Übungsgelände etc. Only Ausbilder create or delete them
   (Ressourcen panel at the bottom of `/kalender`), and anyone signed in can book them
   on Termine. Deleting a Ressource keeps its Termine but removes the booking.
-- Removing a Teilnehmer also removes them from all Termine (of any creator, since
-  Termine span Trupps) and deletes their push subscriptions.
+- Removing a person from a Trupp keeps the account and its Termine. Deleting an account
+  (Benutzerverwaltung) removes it from all Termine (of any creator, since Termine span
+  Trupps) and deletes its push subscriptions.
 - `Buchung` is the shared type for "Ressource booked by a Termin for a time window";
   overlap results come back as `BuchungsKonflikt[]`.
 
@@ -444,20 +572,17 @@ Things SPEC.md left open and how they were resolved:
 - **One shared calendar per instance.** A deployment is one Ausbildung with one exam
   day, and all its Trupps train towards it with the same Ressourcen, so Termine have no
   `truppId`. The API lives at `/api/termine` (not under a Trupp) and the web app at
-  `/kalender`, linked from the header next to the Rangliste for the Ausbildungsleiter
-  and every Teilnehmer. Old entry points redirect there (`/trupps/:id/kalender`,
+  `/kalender`, linked from the header next to the Rangliste for every account. Old entry points redirect there (`/trupps/:id/kalender`,
   `/teilnehmer?tab=kalender`); TruppDetail links to it instead of embedding it.
-- Everyone signed in (the Ausbildungsleiter or any Teilnehmer of any Trupp) sees every
-  Termin. Fixtermine: only the Ausbildungsleiter creates, edits or deletes them.
-  Individualübungen: any Teilnehmer (or the Ausbildungsleiter) can create them, and
-  the creator or the Ausbildungsleiter can edit or delete them — regardless of which
-  Trupps the creator and the assignees belong to. Others see a read-only detail view.
-- Permissions check "is an Ausbildungsleiter" rather than "owns this Trupp": a
-  deployment has a single Ausbildungsleiter account, so there is no per-Trupp ownership
-  to check for calendar data. (Trupp management itself still uses `ownerId`.)
-- Teilnehmer assignment is completely free (any subset of any Trupps, including none).
-  The picker loads `GET /termine/personen` — only id, name, FF, Rolle and Trupp of each
-  Teilnehmer, no Checkliste — groups it by Trupp with a "Ganzen Trupp" toggle per
+- Everyone signed in sees every Termin. Fixtermine: only Ausbilder create, edit or
+  delete them. Individualübungen: any account can create them, and the creator or any
+  Ausbilder can edit or delete them — regardless of which Trupps the creator and the
+  assignees belong to. Others see a read-only detail view.
+- Permissions check the systemRolle `ausbilder`, never Trupp ownership (there is none
+  any more).
+- Assignment is completely free (any subset of any Trupps, including none). The picker
+  loads `GET /termine/personen` — only id, name, FF, systemRolle, APAS-Rolle and Trupp of
+  every account, no Checkliste; accounts without a Trupp come last with `truppName: null` — groups it by Trupp with a "Ganzen Trupp" toggle per
   group, and labels every person as "Name (Trupp …)". Defaults: a new Fixtermin
   pre-selects everyone in every Trupp; a new Individualübung pre-selects the creator.
 - Conflicts: the editor calls `POST /termine/konflikte` live (debounced) and shows a
@@ -480,8 +605,9 @@ Things SPEC.md left open and how they were resolved:
   Prüfungstermin is a plain `YYYY-MM-DD` date with no timezone.
 
 **Push reminders**
-- Reminders go to the Termin's assigned Teilnehmer (any Trupp) and to every
-  Ausbildungsleiter account (normally exactly one), and link to `/kalender`.
+- Reminders go to the Termin's assigned accounts (any Trupp) and to every Ausbilder, and
+  link to `/kalender`. Push subscriptions belong to the account (`owner: { kind:
+  'benutzer', id }`).
 - One reminder per Termin per start time. Moving a Termin re-arms it. The reminder is
   recorded *before* sending (at-most-once, so a crash never causes duplicates). A
   Termin created less than `REMINDER_HOURS_BEFORE` ahead gets its reminder on the

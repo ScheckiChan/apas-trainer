@@ -1,31 +1,34 @@
 import { checklistAmpel, ROLLEN, rollenBesetzung, type TruppSummary, type TeilnehmerCreateResponse } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
-import { db, type TruppRecord } from '../db.js';
-import { isOwner, loadTruppForPrincipal, requireAny, requireLeiter } from '../lib/auth.js';
+import { db, istMitglied, type MitgliedRecord, type TruppRecord } from '../db.js';
+import { isAusbilder, loadTrupp, requireAusbilder, requireAuth, requireRolle } from '../lib/auth.js';
+import { findByName, nameSchema, nameVergeben, newBenutzerRecord, optionalFfSchema } from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId, randomToken } from '../lib/ids.js';
 import { generateTempPassword, hashPassword } from '../lib/password.js';
-import { ffSchema, findByName, nameSchema, newTeilnehmerRecord } from '../lib/teilnehmer.js';
-import { removeSubscriptionsOf } from '../push.js';
 import { toTrupp, toTeilnehmer } from '../serialize.js';
 
 export const truppsRouter = Router();
 
 const isoDate = z.iso.date();
 
-// ---------------------------------------------------------------- Trupps (Ausbildungsleiter)
+// ---------------------------------------------------------------- Trupps
 
-truppsRouter.get('/', requireLeiter, async (req, res) => {
-  const trupps = await db.trupps.find((trupp) => trupp.ownerId === req.leiter!.sub);
-  const teilnehmer = await db.teilnehmer.all();
+/**
+ * All Trupps of the instance. Ausbilder manage them; Prüfer need the list to pick which
+ * Trupp they are scoring (no invite token for them).
+ */
+truppsRouter.get('/', requireAuth, requireRolle('ausbilder', 'pruefer'), async (req, res) => {
+  const [trupps, benutzer] = await Promise.all([db.trupps.all(), db.benutzer.all()]);
+  const includeInvite = isAusbilder(req);
   const body: TruppSummary[] = trupps
     .sort((a, b) => (a.pruefungstermin ?? '9999').localeCompare(b.pruefungstermin ?? '9999'))
     .map((trupp) => {
-      const members = teilnehmer.filter((t) => t.truppId === trupp.id);
+      const members = benutzer.filter((b) => b.truppId === trupp.id);
       const besetzung = rollenBesetzung(members);
       return {
-        ...toTrupp(trupp, { includeInvite: true }),
+        ...toTrupp(trupp, { includeInvite }),
         teilnehmerCount: members.length,
         bereitCount: members.filter((t) => checklistAmpel(t.rolle, t.checkliste) === 'gruen').length,
         rollenBesetzt: ROLLEN.filter((r) => besetzung[r] > 0).length,
@@ -39,14 +42,14 @@ const createSchema = z.object({
   pruefungstermin: isoDate.nullish(),
 });
 
-truppsRouter.post('/', requireLeiter, async (req, res) => {
+truppsRouter.post('/', requireAusbilder, async (req, res) => {
   const input = parseBody(createSchema, req);
   const rec: TruppRecord = {
     id: newId(),
     name: input.name,
     stufe: 'BRONZE',
     pruefungstermin: input.pruefungstermin ?? null,
-    ownerId: req.leiter!.sub,
+    ownerId: req.benutzer!.id,
     inviteToken: randomToken(),
     createdAt: new Date().toISOString(),
   };
@@ -54,9 +57,9 @@ truppsRouter.post('/', requireLeiter, async (req, res) => {
   res.status(201).json(toTrupp(rec, { includeInvite: true }));
 });
 
-truppsRouter.get('/:truppId', requireAny, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
-  res.json(toTrupp(trupp, { includeInvite: isOwner(req, trupp) }));
+truppsRouter.get('/:truppId', requireAuth, async (req, res) => {
+  const trupp = await loadTrupp(req, 'trupp');
+  res.json(toTrupp(trupp, { includeInvite: isAusbilder(req) }));
 });
 
 const patchSchema = z.object({
@@ -64,8 +67,8 @@ const patchSchema = z.object({
   pruefungstermin: isoDate.nullable().optional(),
 });
 
-truppsRouter.patch('/:truppId', requireLeiter, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
+truppsRouter.patch('/:truppId', requireAusbilder, async (req, res) => {
+  const trupp = await loadTrupp(req, 'trupp');
   const input = parseBody(patchSchema, req);
   const updated = await db.trupps.patch(trupp.id, (x) => ({
     ...x,
@@ -75,49 +78,76 @@ truppsRouter.patch('/:truppId', requireLeiter, async (req, res) => {
   res.json(toTrupp(updated!, { includeInvite: true }));
 });
 
-truppsRouter.post('/:truppId/invite/regenerate', requireLeiter, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
+truppsRouter.post('/:truppId/invite/regenerate', requireAusbilder, async (req, res) => {
+  const trupp = await loadTrupp(req, 'trupp');
   const updated = await db.trupps.patch(trupp.id, (x) => ({ ...x, inviteToken: randomToken() }));
   res.json(toTrupp(updated!, { includeInvite: true }));
 });
 
-// ---------------------------------------------------------------- Teilnehmer
+// ---------------------------------------------------------------- Mitglieder
 
-truppsRouter.get('/:truppId/teilnehmer', requireAny, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
-  const list = await db.teilnehmer.find((t) => t.truppId === trupp.id);
+truppsRouter.get('/:truppId/teilnehmer', requireAuth, async (req, res) => {
+  const trupp = await loadTrupp(req, 'mitglieder');
+  const list = (await db.benutzer.all()).filter(istMitglied).filter((b) => b.truppId === trupp.id);
   list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
   res.json(list.map(toTeilnehmer));
 });
 
-const addTeilnehmerSchema = z.object({ name: nameSchema, ff: ffSchema });
+const addTeilnehmerSchema = z.object({ name: nameSchema, ff: optionalFfSchema });
 
 /**
- * Direct add by the owning Ausbildungsleiter (e.g. to pre-populate a Trupp). Creates the
- * Teilnehmer exactly like a self-join, but with a generated password that is returned in
- * plaintext once — the person then logs in via the invite link with name + this password.
+ * "Person hinzufügen", new account: created like a self-join (already a member of this
+ * Trupp) with a generated password that is returned in plaintext once — the person then
+ * logs in with name + this password on the normal login.
  */
-truppsRouter.post('/:truppId/teilnehmer', requireLeiter, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
+truppsRouter.post('/:truppId/teilnehmer', requireAusbilder, async (req, res) => {
+  const trupp = await loadTrupp(req, 'trupp');
   const input = parseBody(addTeilnehmerSchema, req);
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
 
-  const teilnehmer = await db.teilnehmer.update((items) => {
-    const existing = findByName(items, trupp.id, input.name);
+  const rec = await db.benutzer.update((items) => {
+    const existing = findByName(items, input.name);
     if (existing) {
-      throw new HttpError(
-        409,
-        `Der Name „${existing.name}" ist in diesem Trupp schon vergeben. ` +
-          'Unterscheide die Person z. B. mit dem Anfangsbuchstaben des Nachnamens.',
+      throw nameVergeben(
+        existing.name,
+        existing.truppId
+          ? 'Unterscheide die Person z. B. mit dem Anfangsbuchstaben des Nachnamens.'
+          : 'Hat sich die Person schon registriert, wähle sie unter den bestehenden Konten aus. ' +
+              'Sonst unterscheide sie z. B. mit dem Anfangsbuchstaben des Nachnamens.',
       );
     }
-    const rec = newTeilnehmerRecord(trupp.id, { name: input.name, ff: input.ff, passwordHash });
-    return { items: [...items, rec], result: rec };
+    const created = newBenutzerRecord({ name: input.name, ff: input.ff, passwordHash, truppId: trupp.id });
+    return { items: [...items, created], result: created as MitgliedRecord };
   });
 
-  const body: TeilnehmerCreateResponse = { teilnehmer: toTeilnehmer(teilnehmer), tempPassword };
+  const body: TeilnehmerCreateResponse = { teilnehmer: toTeilnehmer(rec), tempPassword };
   res.status(201).json(body);
+});
+
+const zuordnenSchema = z.object({ benutzerId: z.string().min(1).max(100) });
+
+/**
+ * "Person hinzufügen", existing account: attaches a registered account that has no Trupp
+ * yet (see GET /benutzer/ohne-trupp). Idempotent for the same Trupp.
+ */
+truppsRouter.post('/:truppId/teilnehmer/zuordnen', requireAusbilder, async (req, res) => {
+  const trupp = await loadTrupp(req, 'trupp');
+  const { benutzerId } = parseBody(zuordnenSchema, req);
+  const rec = await db.benutzer.update((items) => {
+    const b = items.find((x) => x.id === benutzerId);
+    if (!b) throw new HttpError(404, 'Konto nicht gefunden');
+    if (b.truppId && b.truppId !== trupp.id) {
+      throw new HttpError(409, `${b.name} ist bereits in einem anderen Trupp — dort zuerst entfernen.`);
+    }
+    if (b.truppId !== trupp.id) {
+      b.truppId = trupp.id;
+      b.rolle = null;
+      b.joinedAt = new Date().toISOString();
+    }
+    return { items, result: b as MitgliedRecord };
+  });
+  res.json(toTeilnehmer(rec));
 });
 
 const checkStatus = z.enum(['ok', 'offen']);
@@ -127,41 +157,43 @@ const checklistPatch = z.object({
   tauglichkeit: checkStatus.optional(),
 });
 
-/** Checkliste can be toggled by the Ausbildungsleiter or by the Teilnehmer themself. */
-truppsRouter.patch('/:truppId/teilnehmer/:teilnehmerId/checkliste', requireAny, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
+/** Checkliste can be toggled by an Ausbilder or by the person themself. */
+truppsRouter.patch('/:truppId/teilnehmer/:teilnehmerId/checkliste', requireAuth, async (req, res) => {
+  const trupp = await loadTrupp(req, 'mitglieder');
   const teilnehmerId = String(req.params.teilnehmerId);
-  if (!isOwner(req, trupp) && req.teilnehmer?.sub !== teilnehmerId) {
+  if (!isAusbilder(req) && req.benutzer!.id !== teilnehmerId) {
     throw new HttpError(403, 'Nur die eigene Checkliste kann bearbeitet werden');
   }
   const input = parseBody(checklistPatch, req);
-  const updated = await db.teilnehmer.update((items) => {
+  const updated = await db.benutzer.update((items) => {
     const t = items.find((x) => x.id === teilnehmerId && x.truppId === trupp.id);
     if (!t) return { items, result: undefined };
     // Not applicable for whoever holds GKDT right now. The stored value is kept, so it
     // comes back unchanged if the Rolle is reassigned later.
     if (t.rolle === 'GKDT') delete input.tauglichkeit;
     t.checkliste = { ...t.checkliste, ...input };
-    return { items, result: t };
+    return { items, result: t as MitgliedRecord };
   });
   if (!updated) throw new HttpError(404, 'Teilnehmer nicht gefunden');
   res.json(toTeilnehmer(updated));
 });
 
-truppsRouter.delete('/:truppId/teilnehmer/:teilnehmerId', requireLeiter, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
+/**
+ * Removes the person from this Trupp (APAS-Rolle is cleared). The account itself, its
+ * Checkliste, Termin assignments and push subscriptions stay — it can be attached to a Trupp
+ * again. Deleting the account entirely is DELETE /benutzer/:id.
+ */
+truppsRouter.delete('/:truppId/teilnehmer/:teilnehmerId', requireAusbilder, async (req, res) => {
+  const trupp = await loadTrupp(req, 'trupp');
   const teilnehmerId = String(req.params.teilnehmerId);
-  const removed = await db.teilnehmer.remove((t) => t.id === teilnehmerId && t.truppId === trupp.id);
+  const removed = await db.benutzer.update((items) => {
+    const b = items.find((x) => x.id === teilnehmerId && x.truppId === trupp.id);
+    if (!b) return { items, result: false };
+    b.truppId = null;
+    b.rolle = null;
+    b.joinedAt = null;
+    return { items, result: true };
+  });
   if (!removed) throw new HttpError(404, 'Teilnehmer nicht gefunden');
-  // The calendar is shared, so the Teilnehmer may be assigned to Termine of any Trupp.
-  await db.termine.update((items) => ({
-    items: items.map((t) =>
-      t.teilnehmerIds.includes(teilnehmerId)
-        ? { ...t, teilnehmerIds: t.teilnehmerIds.filter((id) => id !== teilnehmerId) }
-        : t,
-    ),
-    result: undefined,
-  }));
-  await removeSubscriptionsOf({ kind: 'teilnehmer', id: teilnehmerId });
   res.status(204).end();
 });

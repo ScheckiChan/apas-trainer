@@ -15,7 +15,7 @@ const fmt = new Intl.DateTimeFormat('de-AT', {
 /**
  * One tick: finds Termine starting within the next REMINDER_HOURS_BEFORE hours that
  * have not been reminded yet (per terminId + start), pushes to the assigned
- * Teilnehmer (of any Trupp) and the Ausbildungsleiter, and records the reminder.
+ * accounts (of any Trupp) and every Ausbilder, and records the reminder.
  */
 export async function reminderTick(now = new Date()): Promise<void> {
   const horizon = now.getTime() + config.reminderHoursBefore * 3600_000;
@@ -25,17 +25,18 @@ export async function reminderTick(now = new Date()): Promise<void> {
   });
   if (termine.length === 0) return;
 
-  const [sent, leiter] = await Promise.all([db.reminders.all(), db.leiter.all()]);
+  const [sent, ausbilder] = await Promise.all([
+    db.reminders.all(),
+    db.benutzer.find((b) => b.systemRolle === 'ausbilder'),
+  ]);
   const due = termine.filter((t) => !sent.some((r) => r.terminId === t.id && r.start === t.start));
 
   for (const t of due) {
     // Mark first so a crash mid-send never leads to duplicate reminders.
     await db.reminders.insert({ id: newId(), terminId: t.id, start: t.start, sentAt: new Date().toISOString() });
 
-    const owners: PushOwner[] = [
-      ...t.teilnehmerIds.map((id): PushOwner => ({ kind: 'teilnehmer', id })),
-      ...leiter.map((l): PushOwner => ({ kind: 'leiter', id: l.id })),
-    ];
+    const ids = new Set([...t.teilnehmerIds, ...ausbilder.map((a) => a.id)]);
+    const owners = [...ids].map((id): PushOwner => ({ kind: 'benutzer', id }));
     const art = t.typ === 'fix' ? 'Fixtermin' : 'Individualübung';
     const delivered = await sendPushTo(owners, {
       title: `Erinnerung: ${t.titel}`,

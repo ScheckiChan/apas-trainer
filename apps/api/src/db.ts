@@ -1,36 +1,44 @@
-import type { Checkliste, Rolle, StationId, Stufe, TeilErgebnis, TerminTyp } from '@apas/shared';
+import type { Checkliste, Rolle, StationId, Stufe, SystemRolle, TeilErgebnis, TerminTyp, WappenContentType } from '@apas/shared';
 import { config } from './config.js';
 import { JsonCollection } from './lib/store.js';
 
 // Stored record shapes (may contain server-only fields such as hashes).
 
-export interface LeiterRecord {
+/**
+ * One account per person (benutzer.json) — replaces the former ausbildungsleiter.json and
+ * teilnehmer.json (see migrateBenutzer in migrate.ts; ids were kept). `name` is the login
+ * identifier and unique instance-wide by nameKey().
+ */
+export interface BenutzerRecord {
   id: string;
-  email: string;
-  passwordHash: string;
+  name: string;
+  /** bcrypt hash. Missing only on legacy records from the magic-link era (claimable via join). */
+  passwordHash?: string;
+  systemRolle: SystemRolle;
+  ff: string | null;
+  truppId: string | null;
+  /** APAS-Rolle inside the Trupp; null whenever truppId is null. */
+  rolle: Rolle | null;
+  checkliste: Checkliste;
   createdAt: string;
+  /** When attached to the current Trupp; null without a Trupp. */
+  joinedAt: string | null;
 }
+
+/** A BenutzerRecord that is a member of a Trupp. */
+export type MitgliedRecord = BenutzerRecord & { truppId: string };
+
+export const istMitglied = (b: BenutzerRecord): b is MitgliedRecord => b.truppId !== null;
 
 export interface TruppRecord {
   id: string;
   name: string;
   stufe: Stufe;
   pruefungstermin: string | null;
+  /** Creating Ausbilder (informational). */
   ownerId: string;
   inviteToken: string;
   createdAt: string;
-}
-
-export interface TeilnehmerRecord {
-  id: string;
-  truppId: string;
-  name: string;
-  ff: string;
-  rolle: Rolle | null;
-  /** bcrypt hash. Missing only on legacy records from the magic-link era (claimable via join). */
-  passwordHash?: string;
-  joinedAt: string;
-  checkliste: Checkliste;
 }
 
 /** Instance-wide, not attached to a Trupp. */
@@ -53,7 +61,8 @@ export interface TerminRecord {
   createdAt: string;
 }
 
-export type PushOwner = { kind: 'leiter'; id: string } | { kind: 'teilnehmer'; id: string };
+/** Before the unified accounts this was 'leiter' | 'teilnehmer'; migrateBenutzer rewrites old records. */
+export type PushOwner = { kind: 'benutzer'; id: string };
 
 export interface PushSubscriptionRecord {
   id: string;
@@ -81,19 +90,28 @@ export interface ErgebnisRecord {
   teile: TeilErgebnis[];
   bestanden: boolean;
   aufgenommenAm: string;
-  /** Ausbildungsleiter id */
+  /** Benutzer id of whoever saved it (Ausbilder, Prüfer or Teilnehmer) */
   aufgenommenVon: string;
 }
+
+/** Single record, id EINSTELLUNGEN_ID. The Wappen file itself lives next to the JSON files. */
+export interface EinstellungenRecord {
+  id: string;
+  fuehrendeFeuerwehr: string | null;
+  wappen: { datei: string; contentType: WappenContentType; aktualisiertAm: string } | null;
+}
+
+export const EINSTELLUNGEN_ID = 'instanz';
 
 const dir = config.dataDir;
 
 export const db = {
-  leiter: new JsonCollection<LeiterRecord>(dir, 'ausbildungsleiter'),
+  benutzer: new JsonCollection<BenutzerRecord>(dir, 'benutzer'),
   trupps: new JsonCollection<TruppRecord>(dir, 'trupps'),
-  teilnehmer: new JsonCollection<TeilnehmerRecord>(dir, 'teilnehmer'),
   ressourcen: new JsonCollection<RessourceRecord>(dir, 'ressourcen'),
   termine: new JsonCollection<TerminRecord>(dir, 'termine'),
   pushSubscriptions: new JsonCollection<PushSubscriptionRecord>(dir, 'pushsubscriptions'),
   reminders: new JsonCollection<ReminderRecord>(dir, 'reminders'),
   ergebnisse: new JsonCollection<ErgebnisRecord>(dir, 'ergebnisse'),
+  einstellungen: new JsonCollection<EinstellungenRecord>(dir, 'einstellungen'),
 };

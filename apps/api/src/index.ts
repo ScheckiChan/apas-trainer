@@ -1,11 +1,10 @@
 import { createApp } from './app.js';
 import { config } from './config.js';
-import { migrateGruppeToTrupp, migrateSharedCalendar } from './migrate.js';
+import { runMigrations } from './migrate.js';
 import { initPush } from './push.js';
 import { startReminderLoop, stopReminderLoop } from './reminders.js';
 
-migrateGruppeToTrupp(config.dataDir);
-migrateSharedCalendar(config.dataDir);
+runMigrations(config.dataDir);
 initPush();
 
 const server = createApp().listen(config.port, () => {

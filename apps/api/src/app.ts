@@ -4,6 +4,8 @@ import { rateLimit } from 'express-rate-limit';
 import { config } from './config.js';
 import { errorHandler } from './lib/http.js';
 import { authRouter } from './routes/auth.js';
+import { benutzerRouter } from './routes/benutzer.js';
+import { einstellungenRouter } from './routes/einstellungen.js';
 import { ergebnisseRouter, ranglisteRouter } from './routes/ergebnisse.js';
 import { truppsRouter } from './routes/trupps.js';
 import { joinRouter } from './routes/join.js';
@@ -35,19 +37,23 @@ export function createApp() {
   // Password logins: only failed attempts count, so a whole Trupp behind one NAT can
   // still sign in, while brute force is capped at 20 wrong passwords per 15 min and IP.
   const loginLimiter = strict({ limit: 20, skipSuccessfulRequests: true });
-  // Joining creates accounts — every attempt counts.
-  const joinLimiter = strict({ limit: 30 });
+  // Registering / joining creates or changes accounts — every attempt counts. One shared
+  // budget for all three endpoints.
+  const accountLimiter = strict({ limit: 30 });
 
   app.use('/api', apiLimiter);
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
 
-  app.use('/api/auth/leiter/login', loginLimiter);
-  app.post('/api/trupps/:token/login', loginLimiter);
-  app.post('/api/trupps/:token/join', joinLimiter);
+  app.post('/api/auth/login', loginLimiter);
+  app.post('/api/auth/registrieren', accountLimiter);
+  app.post('/api/trupps/:token/join', accountLimiter);
+  app.post('/api/trupps/:token/beitreten', accountLimiter);
 
   app.use('/api/auth', authRouter);
+  app.use('/api/benutzer', benutzerRouter);
+  app.use('/api/einstellungen', einstellungenRouter);
   app.use('/api/termine', termineRouter);
   app.use('/api/ressourcen', ressourcenRouter);
   app.use('/api/trupps/:truppId/ergebnisse', ergebnisseRouter);
