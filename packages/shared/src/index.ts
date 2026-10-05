@@ -112,13 +112,35 @@ export function kannErgebnisSpeichern(
 // Entities
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Login-E-Mail
+// ---------------------------------------------------------------------------
+
 /**
- * One account = one global identity. `name` is both the display name and the login
- * identifier (unique instance-wide, compared case-insensitively). Trupp membership and
+ * Domain of the placeholder addresses (`<id>@ohne-email.lokal`) the migration gives accounts
+ * that had no e-mail on file. Not deliverable (`.lokal` is no real TLD) and rejected as
+ * user input, so an Ausbilder can spot and replace them in the Benutzerverwaltung.
+ */
+export const PLACEHOLDER_EMAIL_DOMAIN = 'ohne-email.lokal';
+
+/** true for a migration placeholder address — flag it in the UI, never present it as real. */
+export function isPlaceholderEmail(email: string): boolean {
+  return email.trim().toLowerCase().endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`);
+}
+
+/**
+ * One account = one global identity. `email` is the login identifier (unique instance-wide,
+ * stored lowercase); `name` is only the display name (not unique). Trupp membership and
  * the Trupp-internal APAS-Rolle are optional.
+ *
+ * Only ever delivered for the signed-in account itself (GET /auth/me & co.) — other people's
+ * e-mail addresses are visible to Ausbilder in the Benutzerverwaltung only.
  */
 export interface Benutzer {
   id: string;
+  /** Login identifier, lowercase. May be a placeholder (see isPlaceholderEmail). */
+  email: string;
+  /** Display name — not unique. */
   name: string;
   /** Freiwillige Feuerwehr — null if never given (self-registration doesn't ask for it). */
   ff: string | null;
@@ -213,7 +235,7 @@ export interface TruppSummary extends Trupp {
   rollenBesetzt: number;
 }
 
-/** An account seen as a member of a Trupp (GET /trupps/:id/teilnehmer and friends). */
+/** An account seen as a member of a Trupp (GET /trupps/:id/teilnehmer and friends). No e-mail (visible to other members). */
 export interface Teilnehmer {
   /** Same id as the Benutzer account. */
   id: string;
@@ -436,14 +458,16 @@ export interface AuthSession extends MeResponse {
   token: string;
 }
 
-/** POST /auth/login — one login for every systemRolle. `name` is case-insensitive. */
+/** POST /auth/login — one login for every systemRolle. `email` is case-insensitive. */
 export interface LoginRequest {
-  name: string;
+  email: string;
   password: string;
 }
 
 /** POST /auth/registrieren — creates a `teilnehmer` account without a Trupp. */
 export interface RegistrierenRequest {
+  email: string;
+  /** Display name. */
   name: string;
   password: string;
   ff?: string | null;
@@ -457,6 +481,7 @@ export interface JoinInfo {
 
 /** POST /trupps/:inviteToken/join — new account, already a member of that Trupp. */
 export interface JoinRequest {
+  email: string;
   name: string;
   ff: string;
   password: string;
@@ -464,6 +489,8 @@ export interface JoinRequest {
 
 /** Ausbilder creates a new account directly in a Trupp (POST /trupps/:id/teilnehmer). */
 export interface TeilnehmerCreateRequest {
+  /** Login of the new account. */
+  email: string;
   name: string;
   ff?: string | null;
 }
@@ -486,6 +513,8 @@ export interface RolleUpdate {
 /** One row of the Benutzerverwaltung (GET /benutzer, GET /benutzer/ohne-trupp). */
 export interface BenutzerUebersicht {
   id: string;
+  /** Login identifier, lowercase. May be a placeholder (see isPlaceholderEmail). */
+  email: string;
   name: string;
   ff: string | null;
   systemRolle: SystemRolle;
@@ -505,6 +534,16 @@ export interface TruppIdentitaetUpdate {
 /** PATCH /benutzer/:id/systemrolle */
 export interface SystemRolleUpdate {
   systemRolle: SystemRolle;
+}
+
+/** PATCH /benutzer/:id/email — Ausbilder only. Must be unique; placeholder domain is rejected. */
+export interface BenutzerEmailUpdate {
+  email: string;
+}
+
+/** PATCH /benutzer/:id/name — Ausbilder only. Display name, not unique. */
+export interface BenutzerNameUpdate {
+  name: string;
 }
 
 /** POST /benutzer/:id/passwort-zuruecksetzen */

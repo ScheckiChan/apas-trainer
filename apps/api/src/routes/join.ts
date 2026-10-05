@@ -3,7 +3,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db, type BenutzerRecord, type TruppRecord } from '../db.js';
 import { requireAuth } from '../lib/auth.js';
-import { ffSchema, findByName, nameSchema, nameVergeben, newBenutzerRecord, passwordSchema } from '../lib/benutzer.js';
+import {
+  emailSchema,
+  emailVergeben,
+  ffSchema,
+  findByEmail,
+  nameKey,
+  nameSchema,
+  newBenutzerRecord,
+  passwordSchema,
+} from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { hashPassword } from '../lib/password.js';
 import { truppIconOf } from '../serialize.js';
@@ -32,6 +41,7 @@ joinRouter.get('/:token/join', async (req, res) => {
 });
 
 const joinSchema = z.object({
+  email: emailSchema,
   name: nameSchema,
   ff: ffSchema,
   password: passwordSchema,
@@ -43,24 +53,22 @@ joinRouter.post('/:token/join', async (req, res) => {
   const passwordHash = await hashPassword(input.password);
 
   const benutzer = await db.benutzer.update((items) => {
-    const existing = findByName(items, input.name);
-    if (existing && !existing.passwordHash && existing.truppId === trupp.id) {
-      // Legacy record from the magic-link era without a password: the first join claims it.
-      const { email: _e, emailVerified: _v, ...rest } = existing as BenutzerRecord & {
-        email?: string;
-        emailVerified?: boolean;
-      };
-      const claimed: BenutzerRecord = { ...rest, name: input.name, ff: input.ff, passwordHash };
-      return { items: items.map((b) => (b.id === existing.id ? claimed : b)), result: claimed };
+    // Legacy record from the magic-link era without a password (same name, same Trupp):
+    // the first join claims it and gives it the submitted login address.
+    const key = nameKey(input.name);
+    const legacy = items.find((b) => !b.passwordHash && b.truppId === trupp.id && nameKey(b.name) === key);
+
+    const taken = findByEmail(items, input.email);
+    if (taken && taken.id !== legacy?.id) {
+      throw emailVergeben(input.email, 'Wenn du das bist, melde dich an und tritt dann über diesen Link bei.');
     }
-    if (existing) {
-      throw nameVergeben(
-        existing.name,
-        'Wenn du das bist, melde dich an und tritt dann über diesen Link bei. ' +
-          'Sonst unterscheide dich z. B. mit dem Anfangsbuchstaben deines Nachnamens.',
-      );
+
+    if (legacy) {
+      const { emailVerified: _v, ...rest } = legacy as BenutzerRecord & { emailVerified?: boolean };
+      const claimed: BenutzerRecord = { ...rest, email: input.email, name: input.name, ff: input.ff, passwordHash };
+      return { items: items.map((b) => (b.id === legacy.id ? claimed : b)), result: claimed };
     }
-    const rec = newBenutzerRecord({ name: input.name, ff: input.ff, passwordHash, truppId: trupp.id });
+    const rec = newBenutzerRecord({ email: input.email, name: input.name, ff: input.ff, passwordHash, truppId: trupp.id });
     return { items: [...items, rec], result: rec };
   });
 

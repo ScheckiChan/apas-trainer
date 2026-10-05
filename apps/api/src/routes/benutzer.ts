@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db, type BenutzerRecord } from '../db.js';
 import { requireAusbilder } from '../lib/auth.js';
+import { emailSchema, emailVergeben, findByEmail, nameSchema } from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { generateTempPassword, hashPassword } from '../lib/password.js';
 import { removeSubscriptionsOf } from '../push.js';
@@ -55,6 +56,40 @@ benutzerRouter.patch('/:benutzerId/systemrolle', async (req, res) => {
     b.systemRolle = systemRolle;
     return { items, result: undefined };
   });
+  const [row] = await uebersicht((b) => b.id === id);
+  res.json(row);
+});
+
+const emailUpdateSchema = z.object({ email: emailSchema });
+
+/**
+ * Sets an account's login address (e.g. replaces an `@ohne-email.lokal` placeholder).
+ * Unique instance-wide — checked inside the write lock, ignoring the account itself so
+ * re-saving the same address is a no-op. Effective for the next login; sessions stay valid.
+ */
+benutzerRouter.patch('/:benutzerId/email', async (req, res) => {
+  const { email } = parseBody(emailUpdateSchema, req);
+  const id = String(req.params.benutzerId);
+  await db.benutzer.update((items) => {
+    const b = items.find((x) => x.id === id);
+    if (!b) throw new HttpError(404, 'Konto nicht gefunden');
+    const taken = findByEmail(items, email);
+    if (taken && taken.id !== id) throw emailVergeben(email, `Es gehört ${taken.name}.`);
+    b.email = email;
+    return { items, result: undefined };
+  });
+  const [row] = await uebersicht((b) => b.id === id);
+  res.json(row);
+});
+
+const nameUpdateSchema = z.object({ name: nameSchema });
+
+/** Changes the display name (not unique, not the login). */
+benutzerRouter.patch('/:benutzerId/name', async (req, res) => {
+  const { name } = parseBody(nameUpdateSchema, req);
+  const id = String(req.params.benutzerId);
+  const updated = await db.benutzer.patch(id, (b) => ({ ...b, name }));
+  if (!updated) throw new HttpError(404, 'Konto nicht gefunden');
   const [row] = await uebersicht((b) => b.id === id);
   res.json(row);
 });

@@ -12,7 +12,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db, istMitglied, type MitgliedRecord, type TruppRecord } from '../db.js';
 import { isAusbilder, loadTrupp, requireAusbilder, requireAuth, requireRolle } from '../lib/auth.js';
-import { findByName, nameSchema, nameVergeben, newBenutzerRecord, optionalFfSchema } from '../lib/benutzer.js';
+import { emailSchema, emailVergeben, findByEmail, nameSchema, newBenutzerRecord, optionalFfSchema } from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId, randomToken } from '../lib/ids.js';
 import { generateTempPassword, hashPassword } from '../lib/password.js';
@@ -138,12 +138,12 @@ truppsRouter.get('/:truppId/teilnehmer', requireAuth, async (req, res) => {
   res.json(list.map(toTeilnehmer));
 });
 
-const addTeilnehmerSchema = z.object({ name: nameSchema, ff: optionalFfSchema });
+const addTeilnehmerSchema = z.object({ email: emailSchema, name: nameSchema, ff: optionalFfSchema });
 
 /**
  * "Person hinzufügen", new account: created like a self-join (already a member of this
  * Trupp) with a generated password that is returned in plaintext once — the person then
- * logs in with name + this password on the normal login.
+ * logs in with this e-mail address + password on the normal login.
  */
 truppsRouter.post('/:truppId/teilnehmer', requireAusbilder, async (req, res) => {
   const trupp = await loadTrupp(req, 'trupp');
@@ -152,17 +152,22 @@ truppsRouter.post('/:truppId/teilnehmer', requireAusbilder, async (req, res) => 
   const passwordHash = await hashPassword(tempPassword);
 
   const rec = await db.benutzer.update((items) => {
-    const existing = findByName(items, input.name);
+    const existing = findByEmail(items, input.email);
     if (existing) {
-      throw nameVergeben(
-        existing.name,
+      throw emailVergeben(
+        input.email,
         existing.truppId
-          ? 'Unterscheide die Person z. B. mit dem Anfangsbuchstaben des Nachnamens.'
-          : 'Hat sich die Person schon registriert, wähle sie unter den bestehenden Konten aus. ' +
-              'Sonst unterscheide sie z. B. mit dem Anfangsbuchstaben des Nachnamens.',
+          ? `Es gehört ${existing.name} und ist bereits in einem Trupp.`
+          : `Es gehört ${existing.name} — wähle es unter den bestehenden Konten aus.`,
       );
     }
-    const created = newBenutzerRecord({ name: input.name, ff: input.ff, passwordHash, truppId: trupp.id });
+    const created = newBenutzerRecord({
+      email: input.email,
+      name: input.name,
+      ff: input.ff,
+      passwordHash,
+      truppId: trupp.id,
+    });
     return { items: [...items, created], result: created as MitgliedRecord };
   });
 

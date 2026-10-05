@@ -16,11 +16,13 @@ import { JsonCollection } from './lib/store.js';
 
 /**
  * One account per person (benutzer.json) — replaces the former ausbildungsleiter.json and
- * teilnehmer.json (see migrateBenutzer in migrate.ts; ids were kept). `name` is the login
- * identifier and unique instance-wide by nameKey().
+ * teilnehmer.json (see migrateBenutzer in migrate.ts; ids were kept). `email` is the login
+ * identifier (lowercase, unique instance-wide by emailKey(); migrateEmail backfilled it,
+ * possibly as a `<id>@ohne-email.lokal` placeholder). `name` is a plain display name.
  */
 export interface BenutzerRecord {
   id: string;
+  email: string;
   name: string;
   /** bcrypt hash. Missing only on legacy records from the magic-link era (claimable via join). */
   passwordHash?: string;

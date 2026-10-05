@@ -3,7 +3,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db, type BenutzerRecord } from '../db.js';
 import { requireAuth, signBenutzerToken } from '../lib/auth.js';
-import { findByName, nameSchema, nameVergeben, newBenutzerRecord, optionalFfSchema, passwordSchema } from '../lib/benutzer.js';
+import {
+  emailKey,
+  emailSchema,
+  emailVergeben,
+  findByEmail,
+  nameSchema,
+  newBenutzerRecord,
+  optionalFfSchema,
+  passwordSchema,
+} from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { toBenutzer, toTrupp } from '../serialize.js';
@@ -25,24 +34,27 @@ export async function authSession(b: BenutzerRecord): Promise<AuthSession> {
 
 // ---------------------------------------------------------------- Login (every systemRolle)
 
+// Deliberately lenient: no format check, so a typo yields the normal 401 instead of a 400
+// that would hint at the address format. Lookup is by emailKey().
 const loginSchema = z.object({
-  name: nameSchema,
+  email: z.string().trim().min(1).max(254),
   password: z.string().min(1).max(200),
 });
 
 authRouter.post('/login', async (req, res) => {
   const input = parseBody(loginSchema, req);
-  const b = findByName(await db.benutzer.all(), input.name);
+  const b = findByEmail(await db.benutzer.all(), emailKey(input.email));
   if (b && !b.passwordHash) {
     throw new HttpError(
       409,
       'Für dieses Konto ist noch kein Passwort gesetzt — bitte einmal über den Einladungslink deines Trupps ' +
-        'mit genau demselben Namen „Neu beitreten" und dabei ein Passwort festlegen.',
+        '„Neu beitreten" (mit genau deinem bisherigen Namen) und dabei ein Passwort festlegen, ' +
+        'oder eine Ausbilderin / einen Ausbilder bitten, dein Passwort zurückzusetzen.',
     );
   }
-  // verifyPassword also runs (against a dummy hash) for unknown names — no timing leak.
+  // verifyPassword also runs (against a dummy hash) for unknown addresses — no timing leak.
   if (!(await verifyPassword(input.password, b?.passwordHash)) || !b) {
-    throw new HttpError(401, 'Name oder Passwort falsch');
+    throw new HttpError(401, 'E-Mail-Adresse oder Passwort falsch');
   }
   res.json(await authSession(b));
 });
@@ -50,6 +62,7 @@ authRouter.post('/login', async (req, res) => {
 // ---------------------------------------------------------------- Self-registration
 
 const registrierenSchema = z.object({
+  email: emailSchema,
   name: nameSchema,
   password: passwordSchema,
   ff: optionalFfSchema,
@@ -61,14 +74,9 @@ authRouter.post('/registrieren', async (req, res) => {
   // Hash outside the collection lock — bcrypt is deliberately slow.
   const passwordHash = await hashPassword(input.password);
   const b = await db.benutzer.update((items) => {
-    const existing = findByName(items, input.name);
-    if (existing) {
-      throw nameVergeben(
-        existing.name,
-        'Wenn du das bist, melde dich an. Sonst unterscheide dich z. B. mit dem Anfangsbuchstaben deines Nachnamens.',
-      );
-    }
-    const rec = newBenutzerRecord({ name: input.name, ff: input.ff, passwordHash });
+    // Unique login address; display names may repeat.
+    if (findByEmail(items, input.email)) throw emailVergeben(input.email);
+    const rec = newBenutzerRecord({ email: input.email, name: input.name, ff: input.ff, passwordHash });
     return { items: [...items, rec], result: rec };
   });
   res.status(201).json(await authSession(b));

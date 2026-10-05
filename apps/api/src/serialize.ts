@@ -42,9 +42,11 @@ export function toTrupp(trupp: TruppRecord, opts: { includeInvite: boolean }): T
   };
 }
 
+/** Own account only (incl. e-mail) — never for lists other Teilnehmer see. */
 export function toBenutzer(b: BenutzerRecord): Benutzer {
   return {
     id: b.id,
+    email: b.email,
     name: b.name,
     ff: b.ff,
     systemRolle: b.systemRolle,
@@ -55,7 +57,7 @@ export function toBenutzer(b: BenutzerRecord): Benutzer {
   };
 }
 
-/** An account in its role as member of a Trupp. */
+/** An account in its role as member of a Trupp. Deliberately without e-mail (other members see it). */
 export function toTeilnehmer(b: MitgliedRecord): Teilnehmer {
   return {
     id: b.id,
@@ -69,10 +71,12 @@ export function toTeilnehmer(b: MitgliedRecord): Teilnehmer {
   };
 }
 
+/** Benutzerverwaltung row (Ausbilder only) — includes the e-mail. */
 export function toBenutzerUebersicht(b: BenutzerRecord, trupps: ReadonlyMap<string, TruppRecord>): BenutzerUebersicht {
   const trupp = b.truppId ? trupps.get(b.truppId) : undefined;
   return {
     id: b.id,
+    email: b.email,
     name: b.name,
     ff: b.ff,
     systemRolle: b.systemRolle,
