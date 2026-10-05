@@ -25,11 +25,23 @@ export function HauptNav() {
         <Icon name="trophy" />
         <span className="hide-md">Rangliste</span>
       </NavLink>
-      {ausbilder && (
-        <NavLink to="/benutzer" className="btn btn-ghost btn-small hn-btn" title="Benutzerverwaltung">
-          <Icon name="user-cog" />
-          <span className="hide-md">Benutzer</span>
+      {!ausbilder && me.benutzer.systemRolle === 'pruefer' && (
+        <NavLink to="/stationen" className="btn btn-ghost btn-small hn-btn" title="Stationen">
+          <Icon name="book-open-check" />
+          <span className="hide-md">Stationen</span>
         </NavLink>
+      )}
+      {ausbilder && (
+        <>
+          <NavLink to="/stationen" className="btn btn-ghost btn-small hn-btn" title="Stationen">
+            <Icon name="book-open-check" />
+            <span className="hide-md">Stationen</span>
+          </NavLink>
+          <NavLink to="/benutzer" className="btn btn-ghost btn-small hn-btn" title="Benutzerverwaltung">
+            <Icon name="user-cog" />
+            <span className="hide-md">Benutzer</span>
+          </NavLink>
+        </>
       )}
       <KontoMenu />
     </>
