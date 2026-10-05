@@ -191,7 +191,7 @@ All endpoints are under `/api`. Auth is `Authorization: Bearer <jwt>`.
 | `GET /termine/personen` (Teilnehmer of all Trupps + Trupp name) | any signed-in            |
 | `GET /trupps/:id/ergebnisse`                               | member / owner                |
 | `PUT /trupps/:id/ergebnisse/:stationId` {zeitSekunden, fehlerpunkte, teile?} | owner                         |
-| `GET /rangliste`                                           | any signed-in user            |
+| `GET /rangliste` (one leaderboard per station)             | any signed-in user            |
 | `GET /push/vapid-public-key` · `POST /push/subscribe` · `POST /push/unsubscribe` | public / any                  |
 | `GET /health`                                              | public                        |
 
@@ -317,22 +317,32 @@ Things SPEC.md left open and how they were resolved:
   `STATION_WERTUNG` (`packages/shared`), which the web content tables also read, so
   the limits live in one place. The server trusts the submitted points; it can't know
   which errors were observed.
-- **Rangliste** (`/rangliste`, header trophy icon for both roles, plus a button in
-  Trupp-Details) lists **every Trupp of the deployment** (one Ausbildung per
-  deployment), for any signed-in Ausbildungsleiter or Teilnehmer. Ranking
-  (`rangliste()` in shared):
-  1. Trupps with all 4 stations recorded come first. Among them, those who pass the
-     Bestehensregel (total ≤ 35 **and** no station over its own limit) rank above those
-     who don't, and within each group fewer total Fehlerpunkte rank higher. Equal
-     points share a rank (1, 1, 3).
-  2. Incomplete Trupps follow **without a rank** ("2/4 Stationen absolviert"), sorted
-     by stations done, then points. A Trupp that already broke a limit is flagged
-     "Limit bereits überschritten".
-  Each row shows rank, status, total, and one chip per station (number, points, pass /
-  fail / open icon). It expands to a per-station table (time, points per Teil,
-  result, when recorded). The page refreshes itself every 30 s while visible.
-  A Teilnehmer's own Trupp is marked "euer Trupp". An Ausbildungsleiter usually owns
-  every Trupp, so the marker is not shown for them.
+- **Rangliste = per-station leaderboards** (`/rangliste`, header trophy icon for both
+  roles, plus a button in Trupp-Details). It is light gamification during live
+  training: Trupps compare their times **per station** ("wer war beim Ausrüsten am
+  schnellsten?"), not one combined ranking. It covers **every Trupp of the deployment**
+  (one Ausbildung per deployment) and is visible to any signed-in Ausbildungsleiter or
+  Teilnehmer. `GET /api/rangliste` returns one list per station in station order
+  (`stationsRanglisten()` in shared):
+  - A station's list holds only the Trupps with a recorded result for it. There is no
+    "offen" placeholder.
+  - **Sorted by Zeit, fastest first.** Equal times share a rank (1, 1, 3). Fehlerpunkte
+    only order rows within an equal time. They never move a Trupp past a faster one.
+  - Every row shows the Fehlerpunkte against that station's own limit and a
+    bestanden / nicht bestanden badge. A fast run that would fail keeps its rank, but its
+    rank and time are muted, so it doesn't read as a clean win.
+  - **Station 4 is one leaderboard**, ranked on the summed time of both Teile
+    (Geräteversorgung + Fragen), because a Trupp runs them back to back and the result is
+    stored as one record. Each row also lists the time and points per Teil. "bestanden"
+    requires both Teile to be within 5 and 6.
+  - The earlier combined ranking (total Fehlerpunkte over all stations against the
+    overall 35-point Bestehensregel, "x/4 Stationen absolviert") was removed, not hidden.
+  On screen, a segmented control picks the station: 4 across on wide screens, 2 × 2 below
+  720 px, so nothing scrolls sideways on a phone. Each segment shows how many Trupps have
+  a result. The choice is kept in `?station=`, and "Zur Rangliste" after saving a result
+  opens the station just run. The page refreshes itself every 30 s while visible. A
+  Teilnehmer's own Trupp is marked "euer Trupp". An Ausbildungsleiter usually owns every
+  Trupp, so the marker is not shown for them.
 - There is no delete for a result (re-saving replaces it) and no history. Removing a
   Trupp isn't supported anywhere yet, so orphaned results can't occur.
 
