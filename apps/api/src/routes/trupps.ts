@@ -1,14 +1,14 @@
 import { checklistAmpel, ROLLEN, rollenBesetzung, type TruppSummary, type TeilnehmerCreateResponse } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
-import { db, type TruppRecord, type RessourceRecord } from '../db.js';
+import { db, type TruppRecord } from '../db.js';
 import { isOwner, loadTruppForPrincipal, requireAny, requireLeiter } from '../lib/auth.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId, randomToken } from '../lib/ids.js';
 import { generateTempPassword, hashPassword } from '../lib/password.js';
 import { ffSchema, findByName, nameSchema, newTeilnehmerRecord } from '../lib/teilnehmer.js';
 import { removeSubscriptionsOf } from '../push.js';
-import { toTrupp, toRessource, toTeilnehmer } from '../serialize.js';
+import { toTrupp, toTeilnehmer } from '../serialize.js';
 
 export const truppsRouter = Router();
 
@@ -153,47 +153,15 @@ truppsRouter.delete('/:truppId/teilnehmer/:teilnehmerId', requireLeiter, async (
   const teilnehmerId = String(req.params.teilnehmerId);
   const removed = await db.teilnehmer.remove((t) => t.id === teilnehmerId && t.truppId === trupp.id);
   if (!removed) throw new HttpError(404, 'Teilnehmer nicht gefunden');
+  // The calendar is shared, so the Teilnehmer may be assigned to Termine of any Trupp.
   await db.termine.update((items) => ({
     items: items.map((t) =>
-      t.truppId === trupp.id ? { ...t, teilnehmerIds: t.teilnehmerIds.filter((id) => id !== teilnehmerId) } : t,
+      t.teilnehmerIds.includes(teilnehmerId)
+        ? { ...t, teilnehmerIds: t.teilnehmerIds.filter((id) => id !== teilnehmerId) }
+        : t,
     ),
     result: undefined,
   }));
   await removeSubscriptionsOf({ kind: 'teilnehmer', id: teilnehmerId });
-  res.status(204).end();
-});
-
-// ---------------------------------------------------------------- Ressourcen
-
-truppsRouter.get('/:truppId/ressourcen', requireAny, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
-  const list = await db.ressourcen.find((r) => r.truppId === trupp.id);
-  list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  res.json(list.map(toRessource));
-});
-
-const ressourceSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  standort: z.string().trim().max(200).default(''),
-});
-
-truppsRouter.post('/:truppId/ressourcen', requireLeiter, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
-  const input = parseBody(ressourceSchema, req);
-  const rec: RessourceRecord = { id: newId(), truppId: trupp.id, name: input.name, standort: input.standort };
-  await db.ressourcen.insert(rec);
-  res.status(201).json(toRessource(rec));
-});
-
-truppsRouter.delete('/:truppId/ressourcen/:ressourceId', requireLeiter, async (req, res) => {
-  const trupp = await loadTruppForPrincipal(req);
-  const ressourceId = String(req.params.ressourceId);
-  const removed = await db.ressourcen.remove((r) => r.id === ressourceId && r.truppId === trupp.id);
-  if (!removed) throw new HttpError(404, 'Ressource nicht gefunden');
-  // Termine keep existing but lose their booking.
-  await db.termine.update((items) => ({
-    items: items.map((t) => (t.ressourceId === ressourceId ? { ...t, ressourceId: null } : t)),
-    result: undefined,
-  }));
   res.status(204).end();
 });

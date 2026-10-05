@@ -26,13 +26,12 @@ export function toTeilnehmer(t: TeilnehmerRecord): Teilnehmer {
 }
 
 export function toRessource(r: RessourceRecord): Ressource {
-  return { id: r.id, truppId: r.truppId, name: r.name, standort: r.standort };
+  return { id: r.id, name: r.name, standort: r.standort };
 }
 
 export function toTermin(t: TerminRecord): Termin {
   return {
     id: t.id,
-    truppId: t.truppId,
     typ: t.typ,
     titel: t.titel,
     start: t.start,

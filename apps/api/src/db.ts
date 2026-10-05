@@ -33,16 +33,16 @@ export interface TeilnehmerRecord {
   checkliste: Checkliste;
 }
 
+/** Instance-wide, not attached to a Trupp. */
 export interface RessourceRecord {
   id: string;
-  truppId: string;
   name: string;
   standort: string;
 }
 
+/** Instance-wide: one shared calendar; teilnehmerIds may span Trupps. */
 export interface TerminRecord {
   id: string;
-  truppId: string;
   typ: TerminTyp;
   titel: string;
   start: string;

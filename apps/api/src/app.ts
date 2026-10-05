@@ -9,6 +9,7 @@ import { truppsRouter } from './routes/trupps.js';
 import { joinRouter } from './routes/join.js';
 import { pushRouter } from './routes/push.js';
 import { teilnehmerRouter } from './routes/teilnehmer.js';
+import { ressourcenRouter } from './routes/ressourcen.js';
 import { termineRouter } from './routes/termine.js';
 
 export function createApp() {
@@ -47,7 +48,8 @@ export function createApp() {
   app.post('/api/trupps/:token/join', joinLimiter);
 
   app.use('/api/auth', authRouter);
-  app.use('/api/trupps/:truppId/termine', termineRouter);
+  app.use('/api/termine', termineRouter);
+  app.use('/api/ressourcen', ressourcenRouter);
   app.use('/api/trupps/:truppId/ergebnisse', ergebnisseRouter);
   app.use('/api/rangliste', ranglisteRouter);
   app.use('/api/trupps', joinRouter);

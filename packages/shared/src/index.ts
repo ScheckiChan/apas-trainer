@@ -118,28 +118,42 @@ export interface Teilnehmer {
   checkliste: Checkliste;
 }
 
+/** Instance-wide: shared by every Trupp of this Ausbildung (e.g. the one vehicle). */
 export interface Ressource {
   id: string;
-  truppId: string;
   name: string;
   standort: string;
 }
 
 export type TerminTyp = 'fix' | 'individual';
 
+/** Instance-wide: one shared calendar for all Trupps of this Ausbildung. */
 export interface Termin {
   id: string;
-  truppId: string;
   typ: TerminTyp;
   titel: string;
   /** ISO datetime */
   start: string;
   /** ISO datetime */
   ende: string;
+  /** Teilnehmer of any Trupp. */
   teilnehmerIds: string[];
   ressourceId?: string | null;
   /** teilnehmerId or 'ausbildungsleiter' */
   createdBy: string;
+}
+
+/**
+ * A Teilnehmer as listed in the shared calendar's picker (GET /termine/personen): only what
+ * is needed to assign people across Trupps — no Checkliste.
+ */
+export interface KalenderPerson {
+  id: string;
+  name: string;
+  ff: string;
+  rolle: Rolle | null;
+  truppId: string;
+  truppName: string;
 }
 
 /** A Ressource booked by a Termin for a time window. */

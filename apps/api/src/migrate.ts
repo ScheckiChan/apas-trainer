@@ -33,3 +33,29 @@ export function migrateGruppeToTrupp(dataDir: string): void {
     console.log(`[migrate] ${name}.json: gruppeId → truppId (${changed})`);
   }
 }
+
+/**
+ * One-time data migration to the shared calendar: Termine and Ressourcen used to belong
+ * to one Trupp and now belong to the whole instance, so their `truppId` is dropped.
+ * Idempotent; runs synchronously at startup after migrateGruppeToTrupp.
+ */
+export function migrateSharedCalendar(dataDir: string): void {
+  for (const name of ['ressourcen', 'termine']) {
+    const file = path.join(dataDir, `${name}.json`);
+    if (!existsSync(file)) continue;
+    const items = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>[];
+    let changed = 0;
+    for (const item of items) {
+      if ('truppId' in item || 'gruppeId' in item) {
+        delete item.truppId;
+        delete item.gruppeId;
+        changed++;
+      }
+    }
+    if (changed === 0) continue;
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    writeFileSync(tmp, JSON.stringify(items, null, 2), 'utf8');
+    renameSync(tmp, file);
+    console.log(`[migrate] ${name}.json: truppId entfernt — Kalender ist jetzt instanzweit (${changed})`);
+  }
+}
