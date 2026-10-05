@@ -225,14 +225,6 @@
   width: 100%;
   max-width: 560px;
   box-shadow: var(--shadow-overlay);
-  animation: cal-modal-in var(--dur) var(--ease-out);
-}
-
-@keyframes cal-modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.5rem);
-  }
 }
 
 .cal-modal-head {
@@ -365,11 +357,5 @@
   .cal-agenda-title,
   .cal-agenda-item .muted {
     white-space: normal;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cal-modal {
-    animation: none;
   }
 }
