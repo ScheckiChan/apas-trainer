@@ -1,72 +1,43 @@
-.join {
-  min-height: 100vh;
-  background: var(--dark);
-  padding: 2rem 1rem;
-}
-
-.join-inner {
-  max-width: 460px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.join-head {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  color: #fff;
-}
-
-.join-head img {
-  border-radius: 12px;
-}
-
-.join-head h1 {
-  font-size: 1.4rem;
-  margin: 0;
-}
-
-.join-head p {
-  margin: 0.2rem 0 0;
-  opacity: 0.85;
-}
-
 .join .btn {
   width: 100%;
 }
 
+/* Segmented control: the active segment is raised, not filled with the accent. */
 .join-tabs {
   display: flex;
-  gap: 0.25rem;
-  background: var(--bg);
+  gap: var(--space-1);
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.25rem;
+  padding: 3px;
 }
 
 .join .join-tab {
   flex: 1;
+  min-height: var(--touch);
   font: inherit;
   font-weight: 600;
-  border: 0;
+  border: 1px solid transparent;
   background: transparent;
-  padding: 0.55rem;
-  border-radius: 8px;
+  border-radius: calc(var(--radius) - 3px);
   cursor: pointer;
-  color: var(--grey);
+  color: var(--muted);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.join .join-tab:hover {
+  color: var(--ink);
 }
 
 .join .join-tab-active {
-  background: var(--red);
-  color: #fff;
+  background: var(--surface-raised);
+  border-color: var(--border);
+  color: var(--ink);
 }
 
 .join .join-switch {
   width: auto;
-  margin-top: 0.5rem;
-}
-
-.join-hint {
-  margin: 0.25rem 0 0;
+  margin-top: var(--space-2);
 }

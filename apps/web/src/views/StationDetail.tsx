@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { FehlerCheckliste } from '../components/FehlerCheckliste';
 import { Flashcards } from '../components/Flashcards';
+import { Icon } from '../components/Icon';
 import { StepThrough } from '../components/StepThrough';
 import { FRAGENKATALOG, QUELLE, STATIONEN, stationById, type Zeitvorgabe } from '../content/stations';
 import './StationDetail.css';
@@ -18,8 +19,14 @@ export function StationDetail({ stationId, basePath }: { stationId: string | und
   if (!station) {
     return (
       <div className="stack">
-        <div className="alert alert-error">Station nicht gefunden.</div>
-        <Link to={basePath}>← Zur Stationsübersicht</Link>
+        <div className="alert alert-error">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">Station nicht gefunden.</div>
+        </div>
+        <Link to={basePath} className="btn btn-secondary">
+          <Icon name="arrow-left" />
+          Zur Stationsübersicht
+        </Link>
       </div>
     );
   }
@@ -31,24 +38,27 @@ export function StationDetail({ stationId, basePath }: { stationId: string | und
   return (
     <div className="sd stack">
       <div>
-        <Link to={basePath} className="sd-back">
-          ← Alle Stationen
-        </Link>
-        <div className="station-nr">
-          Station {station.nr} · Bestimmungen Abschnitt {station.abschnitt}
-        </div>
         <h1>{station.titel}</h1>
+        <p className="sd-meta num">
+          Station {station.nr} von {STATIONEN.length} · Bestimmungen Abschnitt {station.abschnitt}
+        </p>
       </div>
 
       <section className="sd-zeit" aria-label="Zeitvorgabe">
-        {station.zeitvorgaben.map((z) => (
-          <ZeitChip key={z.label} z={z} />
-        ))}
+        <h2 className="sd-zeit-title">
+          <Icon name="clock" /> Soll-Zeit
+        </h2>
+        <dl className="sd-zeit-list">
+          {station.zeitvorgaben.map((z) => (
+            <ZeitZeile key={z.label} z={z} />
+          ))}
+        </dl>
       </section>
 
       {station.hinweise.length > 0 && (
         <div className="alert alert-warn">
-          <ul className="sd-hinweise">
+          <Icon name="triangle-alert" />
+          <ul className="alert-body sd-hinweise">
             {station.hinweise.map((h) => (
               <li key={h}>{h}</li>
             ))}
@@ -99,15 +109,21 @@ export function StationDetail({ stationId, basePath }: { stationId: string | und
 
       <nav className="sd-pager">
         {prev ? (
-          <Link className="btn btn-secondary" to={`${basePath}/${prev.id}`}>
-            ← {prev.nr}. {prev.titel}
+          <Link className="btn btn-secondary sd-pager-prev" to={`${basePath}/${prev.id}`}>
+            <Icon name="chevron-left" />
+            <span>
+              {prev.nr}. {prev.titel}
+            </span>
           </Link>
         ) : (
           <span />
         )}
         {next && (
-          <Link className="btn btn-secondary" to={`${basePath}/${next.id}`}>
-            {next.nr}. {next.titel} →
+          <Link className="btn btn-secondary sd-pager-next" to={`${basePath}/${next.id}`}>
+            <span>
+              {next.nr}. {next.titel}
+            </span>
+            <Icon name="chevron-right" />
           </Link>
         )}
       </nav>
@@ -117,17 +133,17 @@ export function StationDetail({ stationId, basePath }: { stationId: string | und
   );
 }
 
-function ZeitChip({ z }: { z: Zeitvorgabe }) {
+function ZeitZeile({ z }: { z: Zeitvorgabe }) {
   return (
-    <div className="sd-zeit-chip">
-      <span className="sd-zeit-label">{z.label}</span>
+    <div className="sd-zeit-row">
+      <dt>{z.label}</dt>
       {z.sekunden !== null ? (
-        <>
-          <strong>Soll: {z.sekunden} Sek.</strong>
-          <span className="sd-zeit-min">max. {minuten(z.sekunden)}</span>
-        </>
+        <dd className="num">
+          <strong>{z.sekunden} Sek.</strong>
+          <span>max. {minuten(z.sekunden)}</span>
+        </dd>
       ) : (
-        <strong className="sd-zeit-text">{z.hinweis}</strong>
+        <dd className="sd-zeit-text">{z.hinweis}</dd>
       )}
     </div>
   );

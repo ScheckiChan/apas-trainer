@@ -1,8 +1,10 @@
 import type { JoinInfo, JoinRequest, TeilnehmerLoginRequest, TeilnehmerSession } from '@apas/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Icon } from '../components/Icon';
 import { HttpError, api, errorMessage, lastInvite, rememberInvite, setToken } from '../lib/api';
 import { formatDate } from '../lib/format';
+import './Login.css';
 import './Join.css';
 
 type Mode = 'neu' | 'anmelden';
@@ -30,6 +32,7 @@ export function Join() {
   const [nameTaken, setNameTaken] = useState(false);
 
   const base = `/trupps/${encodeURIComponent(token)}`;
+  const mismatch = mode === 'neu' && repeat.length > 0 && repeat !== password;
 
   useEffect(() => {
     api<JoinInfo>(`${base}/join`, { auth: 'none' })
@@ -74,22 +77,29 @@ export function Join() {
   };
 
   return (
-    <div className="join">
-      <div className="join-inner">
-        <div className="join-head">
-          <img src="/icons/icon-192.png" alt="" width={56} height={56} />
+    <main className="auth join">
+      <div className="auth-inner">
+        <div className="auth-brand">
+          <img src="/icons/icon-192.png" alt="" width={48} height={48} />
           <div>
             <h1>APAS-Trainer</h1>
-            {info && (
+            {info ? (
               <p>
                 Trupp <strong>{info.truppName}</strong>
-                {info.pruefungstermin && <> · Prüfung am {formatDate(info.pruefungstermin)}</>}
+                {info.pruefungstermin && <span className="num"> · Prüfung am {formatDate(info.pruefungstermin)}</span>}
               </p>
+            ) : (
+              !loadError && <p>Einladung wird geladen…</p>
             )}
           </div>
         </div>
 
-        {loadError && <div className="alert alert-error">{loadError}</div>}
+        {loadError && (
+          <div className="alert alert-error" role="alert">
+            <Icon name="triangle-alert" />
+            <div className="alert-body">{loadError}</div>
+          </div>
+        )}
 
         {info && (
           <form className="card stack" onSubmit={submit}>
@@ -118,15 +128,22 @@ export function Join() {
                 : 'Schon beigetreten? Melde dich mit deinem Namen und Passwort an.'}
             </p>
             {error && (
-              <div className="alert alert-error">
-                {error}
-                {nameTaken && (
-                  <div>
-                    <button type="button" className="btn btn-secondary btn-small join-switch" onClick={() => switchMode('anmelden')}>
-                      Zu „Anmelden" wechseln
-                    </button>
-                  </div>
-                )}
+              <div className="alert alert-error" role="alert">
+                <Icon name="triangle-alert" />
+                <div className="alert-body">
+                  {error}
+                  {nameTaken && (
+                    <div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-small join-switch"
+                        onClick={() => switchMode('anmelden')}
+                      >
+                        Zu „Anmelden" wechseln
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             <div>
@@ -180,19 +197,23 @@ export function Join() {
                     minLength={8}
                     maxLength={72}
                     autoComplete="new-password"
+                    aria-invalid={mismatch || undefined}
+                    aria-describedby="join-repeat-hint"
                     value={repeat}
                     onChange={(e) => setRepeat(e.target.value)}
                   />
-                  <p className="muted join-hint">Mindestens 8 Zeichen.</p>
+                  <p id="join-repeat-hint" className={`field-hint ${mismatch ? 'field-hint-error' : ''}`}>
+                    {mismatch ? 'Stimmt noch nicht mit dem Passwort überein.' : 'Mindestens 8 Zeichen.'}
+                  </p>
                 </div>
               )}
             </div>
-            <button className="btn" type="submit" disabled={busy}>
+            <button className="btn" type="submit" disabled={busy} aria-busy={busy}>
               {busy ? 'Bitte warten…' : mode === 'neu' ? 'Beitreten' : 'Anmelden'}
             </button>
           </form>
         )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -1,58 +1,70 @@
 .sd h1 {
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
   margin: 0;
 }
 
-.sd h2 {
-  font-size: 1.15rem;
+.sd-meta {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
-.sd-back {
-  display: inline-block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-decoration: none;
-  padding: 0.35rem 0;
-  margin-bottom: 0.4rem;
+.sd h2 {
+  font-size: var(--text-lg);
 }
+
+/* ---------- Soll-Zeit: real numbers, large and tabular ---------- */
 
 .sd-zeit {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
 }
 
-.sd-zeit-chip {
+.sd .sd-zeit-title {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.75rem 0.9rem;
-  border-radius: var(--radius);
-  background: var(--red);
-  color: #fff;
-  box-shadow: var(--shadow);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin: 0 0 var(--space-2);
 }
 
-.sd-zeit-chip strong {
-  font-size: 1.45rem;
-  line-height: 1.15;
+.sd-zeit-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
 }
 
-.sd-zeit-chip .sd-zeit-text {
-  font-size: 1rem;
+.sd-zeit-row dt {
+  font-size: var(--text-sm);
+  color: var(--muted);
 }
 
-.sd-zeit-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.85;
+.sd-zeit-row dd {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
 }
 
-.sd-zeit-min {
-  font-size: 0.8rem;
-  opacity: 0.85;
+.sd-zeit-row strong {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+}
+
+.sd-zeit-row dd span {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.sd-zeit-row .sd-zeit-text {
+  font-weight: 600;
 }
 
 .sd-hinweise {
@@ -61,7 +73,7 @@
 }
 
 .sd-intro {
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--space-3);
 }
 
 .sd-zusatz p,
@@ -71,34 +83,37 @@
 
 .sd-zusatz ol {
   padding-left: 1.2rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .sd-zusatz li + li {
-  margin-top: 0.35rem;
+  margin-top: var(--space-1);
 }
+
+/* ---------- Prev / next station ---------- */
 
 .sd-pager {
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .sd-pager .btn {
-  min-height: 2.75rem;
+  max-width: 100%;
 }
 
-@media (max-width: 420px) {
-  .sd-zeit {
-    grid-template-columns: 1fr 1fr;
+.sd-pager-next {
+  margin-left: auto;
+}
+
+@media (max-width: 480px) {
+  .sd-pager .btn {
+    flex: 1 1 100%;
+    justify-content: space-between;
   }
 
-  .sd-zeit-chip {
-    padding: 0.6rem 0.7rem;
-  }
-
-  .sd-zeit-chip strong {
-    font-size: 1.2rem;
+  .sd-pager-prev {
+    justify-content: flex-start;
   }
 }

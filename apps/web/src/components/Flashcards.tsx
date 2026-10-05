@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Frage } from '../content/stations';
+import { Icon } from './Icon';
 import './Flashcards.css';
 
 function shuffled<T>(items: readonly T[]): T[] {
@@ -35,11 +36,12 @@ export function Flashcards({ fragen }: { fragen: readonly Frage[] }) {
   return (
     <div className="flash">
       <div className="flash-head">
-        <span className="flash-count">
-          Karte {index + 1} von {total}
+        <span className="flash-count num">
+          Karte <strong>{index + 1}</strong> von {total}
         </span>
         <button type="button" className="btn btn-ghost btn-small" onClick={toggleShuffle} aria-pressed={isShuffled}>
-          {isShuffled ? '↺ Originalreihenfolge' : '🔀 Mischen'}
+          <Icon name={isShuffled ? 'rotate-ccw' : 'shuffle'} />
+          {isShuffled ? 'Originalreihenfolge' : 'Mischen'}
         </button>
       </div>
 
@@ -61,12 +63,14 @@ export function Flashcards({ fragen }: { fragen: readonly Frage[] }) {
       >
         <div className="flash-inner">
           <div className="flash-face flash-front" aria-hidden={flipped}>
-            <span className="flash-label">Frage {frage.nr}</span>
+            <span className="flash-label num">Frage {frage.nr}</span>
             <p className="flash-question">{frage.frage}</p>
-            <span className="flash-hint">Tippen zum Umdrehen</span>
+            <span className="flash-hint">
+              <Icon name="refresh-cw" size="1em" /> Tippen zum Umdrehen
+            </span>
           </div>
           <div className="flash-face flash-back" aria-hidden={!flipped}>
-            <span className="flash-label">Antwort {frage.nr}</span>
+            <span className="flash-label num">Antwort {frage.nr}</span>
             {Array.isArray(frage.antwort) ? (
               <ul className="flash-answer">
                 {frage.antwort.map((a) => (
@@ -82,10 +86,12 @@ export function Flashcards({ fragen }: { fragen: readonly Frage[] }) {
 
       <div className="flash-nav">
         <button type="button" className="btn btn-secondary" onClick={() => goTo(index - 1)}>
-          ← Vorherige
+          <Icon name="chevron-left" />
+          Vorherige
         </button>
         <button type="button" className="btn" onClick={() => goTo(index + 1)}>
-          Nächste →
+          Nächste
+          <Icon name="chevron-right" />
         </button>
       </div>
     </div>

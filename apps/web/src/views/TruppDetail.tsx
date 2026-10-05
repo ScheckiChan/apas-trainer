@@ -364,6 +364,7 @@ function InvitePanel({ trupp, onRegenerated }: { trupp: Trupp; onRegenerated: (t
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Literal colours: the QR is a raster image (dark = --ink), kept dark-on-white in both schemes.
     QRCode.toDataURL(link, { width: 220, margin: 1, color: { dark: '#221716', light: '#ffffff' } })
       .then(setQr)
       .catch(() => setQr(null));

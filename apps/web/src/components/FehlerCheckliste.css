@@ -1,23 +1,27 @@
+.fcl + .fcl {
+  margin-top: var(--space-5);
+}
+
 .fcl-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .fcl-head h3 {
-  font-size: 1rem;
+  font-size: var(--text-base);
   margin: 0;
 }
 
 .fcl-hint {
-  margin: 0.25rem 0 0;
+  margin: var(--space-1) 0 0;
 }
 
 .fcl-list {
   list-style: none;
-  margin: 0.5rem 0 0;
+  margin: var(--space-2) 0 0;
   padding: 0;
 }
 
@@ -25,51 +29,52 @@
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 0.65rem;
+  gap: var(--space-3);
   min-height: 3rem;
   margin: 0;
-  padding: 0.45rem 0.25rem;
-  border-top: 1px solid var(--grey-light);
-  font-size: 0.95rem;
+  padding: var(--space-2) var(--space-1);
+  border-top: 1px solid var(--border);
+  font-size: var(--text-base);
   font-weight: 400;
   cursor: pointer;
-  transition: background 0.15s ease;
 }
 
 .fcl-item input {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.375rem;
+  height: 1.375rem;
   margin: 0;
-  accent-color: var(--green);
 }
 
 .fcl-done .fcl-text {
-  color: var(--grey);
+  color: var(--muted);
   text-decoration: line-through;
 }
 
 .fcl-points {
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: 600;
   text-align: right;
   white-space: nowrap;
-  color: var(--dark);
-  background: var(--grey-light);
+  color: var(--ink);
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.1rem 0.5rem;
+  padding: 0.05rem 0.55rem;
 }
 
+/* 10+ points: a single mistake that alone can end the station. */
 .fcl-points-high {
-  background: var(--red);
-  color: #fff;
+  background: var(--accent-subtle);
+  border-color: color-mix(in oklch, var(--accent) 30%, transparent);
+  color: var(--accent-text);
 }
 
 .fcl-foot {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 0.4rem;
-  min-height: 2rem;
+  margin-top: var(--space-1);
+  min-height: 2.25rem;
 }
 
 @media (max-width: 420px) {

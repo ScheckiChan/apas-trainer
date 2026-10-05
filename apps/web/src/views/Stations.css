@@ -1,76 +1,102 @@
-.stations h1 {
-  font-size: 1.4rem;
-}
-
+/* Decide/Learn surface: a little more typographic confidence than the admin screens. */
 .stations-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: var(--space-4);
 }
 
 .station-card {
-  display: flex;
-  flex-direction: column;
-  border-top: 4px solid var(--red);
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   color: inherit;
   text-decoration: none;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease-out);
 }
 
 .station-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-color: var(--border-strong);
 }
 
-.station-card:active {
-  transform: scale(0.99);
+.station-card:hover .station-more {
+  text-decoration: underline;
 }
 
-.station-more {
-  margin-top: auto;
-  padding-top: 0.75rem;
-  font-size: 0.9rem;
+.station-nr {
+  font-size: var(--text-3xl);
   font-weight: 700;
-  color: var(--red);
+  line-height: 1;
+  color: var(--accent-text);
+  letter-spacing: -0.03em;
 }
 
-.station-card h2 {
-  font-size: 1.1rem;
+.station-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.station-card p {
-  margin: 0 0 0.5rem;
+.station-body h2 {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-1);
 }
 
-.station-card ul,
+.station-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.station-facts span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.station-body p {
+  margin: 0 0 var(--space-2);
+}
+
+.station-body ul,
 .stations-rules ul {
   margin: 0;
   padding-left: 1.2rem;
 }
 
-.station-card li {
-  font-size: 0.92rem;
+.station-body li {
+  font-size: var(--text-sm);
+  color: var(--muted);
 }
 
-.station-nr {
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--red);
-  margin-bottom: 0.2rem;
-}
-
-.stations-rules {
-  background: var(--dark);
-  color: #fff;
+.station-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: auto;
+  padding-top: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--accent-text);
 }
 
 .stations-rules li + li {
-  margin-top: 0.3rem;
+  margin-top: var(--space-1);
 }
 
 .stations-source {
-  font-size: 0.8rem;
-  color: var(--grey);
-  margin: 1.5rem 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin: var(--space-5) 0 0;
+  max-width: 70ch;
 }

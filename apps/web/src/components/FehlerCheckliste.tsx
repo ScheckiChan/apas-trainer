@@ -21,7 +21,7 @@ export function FehlerCheckliste({ tabelle }: { tabelle: FehlerTabelle }) {
     <div className="fcl">
       <div className="fcl-head">
         <h3>{tabelle.titel}</h3>
-        <span className="badge badge-red">max. {tabelle.maxPunkte} Fehlerpunkte</span>
+        <span className="badge num">max. {tabelle.maxPunkte} Fehlerpunkte</span>
       </div>
       {tabelle.hinweis && <p className="muted fcl-hint">{tabelle.hinweis}</p>}
       <ul className="fcl-list">
@@ -32,14 +32,14 @@ export function FehlerCheckliste({ tabelle }: { tabelle: FehlerTabelle }) {
               <label className={`fcl-item ${done ? 'fcl-done' : ''}`}>
                 <input type="checkbox" checked={done} onChange={() => toggle(i)} />
                 <span className="fcl-text">{z.fehler}</span>
-                <span className={`fcl-points ${z.punkte >= 10 ? 'fcl-points-high' : ''}`}>{punkteLabel(z)}</span>
+                <span className={`fcl-points num ${z.punkte >= 10 ? 'fcl-points-high' : ''}`}>{punkteLabel(z)}</span>
               </label>
             </li>
           );
         })}
       </ul>
       <div className="fcl-foot">
-        <span className="muted">
+        <span className="muted num">
           {checked.size} von {tabelle.zeilen.length} vermieden
         </span>
         {checked.size > 0 && (

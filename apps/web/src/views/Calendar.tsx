@@ -8,6 +8,7 @@ import {
   type TerminTyp,
 } from '@apas/shared';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Icon } from '../components/Icon';
 import { rolleShort } from '../components/Rollen';
 import { api, errorMessage } from '../lib/api';
 import { formatDateTime, formatTime, localToIso, toLocalDateKey, toLocalTime } from '../lib/format';
@@ -28,6 +29,16 @@ type EditorState =
   | null;
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+/** Fixtermin vs. Individualübung: icon + fill style + label, never colour alone. */
+function TypIcon({ typ }: { typ: TerminTyp }) {
+  return (
+    <span className={`cal-typ ${typ === 'fix' ? 'cal-typ-fix' : 'cal-typ-individual'}`}>
+      <Icon name={typ === 'fix' ? 'users' : 'user'} size="1em" />
+      <span className="sr-only">{typ === 'fix' ? 'Fixtermin' : 'Individualübung'}</span>
+    </span>
+  );
+}
 const monthFmt = new Intl.DateTimeFormat('de-AT', { month: 'long', year: 'numeric' });
 
 /** 6×7 grid starting on the Monday on/before the 1st of the month. */
@@ -104,12 +115,12 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
     <div className="cal stack">
       <div className="cal-toolbar">
         <div className="cal-nav">
-          <button type="button" className="btn btn-secondary btn-small" onClick={() => shiftMonth(-1)} aria-label="Vorheriger Monat">
-            ‹
+          <button type="button" className="btn btn-secondary btn-icon" onClick={() => shiftMonth(-1)} aria-label="Vorheriger Monat">
+            <Icon name="chevron-left" />
           </button>
-          <h2>{monthFmt.format(month)}</h2>
-          <button type="button" className="btn btn-secondary btn-small" onClick={() => shiftMonth(1)} aria-label="Nächster Monat">
-            ›
+          <h2 className="num">{monthFmt.format(month)}</h2>
+          <button type="button" className="btn btn-secondary btn-icon" onClick={() => shiftMonth(1)} aria-label="Nächster Monat">
+            <Icon name="chevron-right" />
           </button>
           <button
             type="button"
@@ -122,7 +133,8 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
         <div className="btn-row">
           {auth === 'leiter' && (
             <button type="button" className="btn" onClick={() => setEditor({ mode: 'create', typ: 'fix', date: defaultDate() })}>
-              + Neuer Fixtermin
+              <Icon name="plus" />
+              Neuer Fixtermin
             </button>
           )}
           <button
@@ -130,21 +142,29 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
             className={`btn ${auth === 'leiter' ? 'btn-secondary' : ''}`}
             onClick={() => setEditor({ mode: 'create', typ: 'individual', date: defaultDate() })}
           >
-            + Neue Individualübung
+            <Icon name="plus" />
+            Neue Individualübung
           </button>
         </div>
       </div>
 
-      <div className="cal-legend muted">
-        <span>
-          <span className="cal-chip cal-fix">Fixtermin</span>
+      <div className="cal-legend">
+        <span className="cal-legend-item">
+          <span className="cal-swatch cal-fix" />
+          <Icon name="users" size="1em" /> Fixtermin <span className="muted">— gemeinsam, vom Ausbildungsleiter</span>
         </span>
-        <span>
-          <span className="cal-chip cal-individual">Individualübung</span>
+        <span className="cal-legend-item">
+          <span className="cal-swatch cal-individual" />
+          <Icon name="user" size="1em" /> Individualübung <span className="muted">— selbst eingetragen</span>
         </span>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error">
+          <Icon name="triangle-alert" />
+          <div className="alert-body">{error}</div>
+        </div>
+      )}
 
       <div className="cal-grid" role="grid">
         {WEEKDAYS.map((d) => (
@@ -163,7 +183,7 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
               className={`cal-day ${inMonth ? '' : 'cal-day-out'} ${key === todayKey ? 'cal-day-today' : ''}`}
               onClick={() => setEditor({ mode: 'create', typ: auth === 'leiter' ? 'fix' : 'individual', date: key })}
             >
-              <div className="cal-day-num">{day.getDate()}</div>
+              <div className="cal-day-num num">{day.getDate()}</div>
               {items.map((t) => (
                 <button
                   key={t.id}
@@ -175,7 +195,8 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
                     setEditor({ mode: 'edit', termin: t });
                   }}
                 >
-                  <span className="cal-chip-time">{formatTime(t.start)}</span> {t.titel}
+                  <span className="sr-only">{t.typ === 'fix' ? 'Fixtermin' : 'Individualübung'}: </span>
+                  <span className="cal-chip-time num">{formatTime(t.start)}</span> {t.titel}
                 </button>
               ))}
             </div>
@@ -192,8 +213,8 @@ export function Calendar({ truppId, auth, currentTeilnehmerId }: CalendarProps) 
             {upcoming.map((t) => (
               <li key={t.id}>
                 <button type="button" className="cal-agenda-item" onClick={() => setEditor({ mode: 'edit', termin: t })}>
-                  <span className={`cal-dot ${t.typ === 'fix' ? 'cal-fix' : 'cal-individual'}`} />
-                  <span className="cal-agenda-when">{formatDateTime(t.start)}</span>
+                  <TypIcon typ={t.typ} />
+                  <span className="cal-agenda-when num">{formatDateTime(t.start)}</span>
                   <span className="cal-agenda-title">{t.titel}</span>
                   {t.ressourceId && (
                     <span className="muted">· {ressourcen.find((r) => r.id === t.ressourceId)?.name ?? 'Ressource'}</span>
@@ -367,14 +388,19 @@ function TerminEditor({
       >
         <div className="cal-modal-head">
           <h2>
-            <span className={`cal-dot ${typ === 'fix' ? 'cal-fix' : 'cal-individual'}`} /> {heading}
+            <TypIcon typ={typ} /> {heading}
           </h2>
-          <button type="button" className="btn btn-ghost btn-small" onClick={onClose} aria-label="Schließen">
-            ✕
+          <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Schließen">
+            <Icon name="x" />
           </button>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="alert alert-error" role="alert">
+            <Icon name="triangle-alert" />
+            <div className="alert-body">{error}</div>
+          </div>
+        )}
 
         <fieldset disabled={!canEdit || busy} className="cal-fieldset">
           <div className="field">
@@ -411,15 +437,18 @@ function TerminEditor({
 
           {konflikte.length > 0 && (
             <div className="alert alert-warn" role="status">
-              <strong>⚠ {ressourceName(ressourceId)} ist in diesem Zeitraum bereits gebucht:</strong>
-              <ul className="cal-conflicts">
-                {konflikte.map((k) => (
-                  <li key={k.terminId}>
-                    {k.titel} — {formatDateTime(k.start)}–{formatTime(k.ende)}
-                  </li>
-                ))}
-              </ul>
-              Speichern ist trotzdem möglich — bitte untereinander abstimmen.
+              <Icon name="triangle-alert" />
+              <div className="alert-body">
+                <strong>{ressourceName(ressourceId)} ist in diesem Zeitraum schon gebucht:</strong>
+                <ul className="cal-conflicts num">
+                  {konflikte.map((k) => (
+                    <li key={k.terminId}>
+                      {k.titel} — {formatDateTime(k.start)}–{formatTime(k.ende)}
+                    </li>
+                  ))}
+                </ul>
+                <span className="muted">Speichern geht trotzdem — bitte untereinander abstimmen.</span>
+              </div>
             </div>
           )}
 
@@ -459,7 +488,7 @@ function TerminEditor({
 
         <div className="btn-row cal-modal-actions">
           {canEdit && (
-            <button type="submit" className="btn" disabled={busy}>
+            <button type="submit" className="btn" disabled={busy} aria-busy={busy}>
               {busy ? 'Speichern…' : 'Speichern'}
             </button>
           )}
@@ -468,6 +497,7 @@ function TerminEditor({
           </button>
           {existing && canEdit && (
             <button type="button" className="btn btn-ghost cal-delete" onClick={remove}>
+              <Icon name="trash-2" />
               Löschen
             </button>
           )}

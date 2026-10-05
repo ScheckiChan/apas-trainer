@@ -1,5 +1,6 @@
 import { useRef, useState, type TouchEvent } from 'react';
 import type { AblaufSchritt } from '../content/stations';
+import { Icon } from './Icon';
 import './StepThrough.css';
 
 /**
@@ -33,23 +34,29 @@ export function StepThrough({ schritte }: { schritte: AblaufSchritt[] }) {
 
   return (
     <div className="steps">
-      <div className="steps-progress-label" aria-live="polite">
-        Schritt {index + 1} von {total}
+      <div className="steps-progress-label num" aria-live="polite">
+        Schritt <strong>{index + 1}</strong> von {total}
       </div>
+      {/* One segment per step: you can count where you are, not just estimate it. */}
       <div
         className="steps-progress"
         role="progressbar"
+        aria-label="Fortschritt"
         aria-valuemin={1}
         aria-valuemax={total}
         aria-valuenow={index + 1}
       >
-        <div style={{ width: `${((index + 1) / total) * 100}%` }} />
+        {schritte.map((s, i) => (
+          <span key={s.titel} className={i <= index ? 'steps-progress-done' : ''} />
+        ))}
       </div>
 
       <div className="steps-stage" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* key remounts the card so the enter animation runs on every step change */}
         <article key={index} className={`steps-card steps-enter-${dir}`}>
-          <div className="steps-card-nr">{index + 1}</div>
+          <div className="steps-card-nr num" aria-hidden="true">
+            {index + 1}
+          </div>
           <div className="steps-card-body">
             <h3>{step.titel}</h3>
             <SchrittInhalt schritt={step} />
@@ -59,15 +66,18 @@ export function StepThrough({ schritte }: { schritte: AblaufSchritt[] }) {
 
       <div className="steps-nav">
         <button type="button" className="btn btn-secondary" onClick={() => goTo(index - 1)} disabled={index === 0}>
-          ← Zurück
+          <Icon name="chevron-left" />
+          Zurück
         </button>
         {index < total - 1 ? (
           <button type="button" className="btn" onClick={() => goTo(index + 1)}>
-            Weiter →
+            Weiter
+            <Icon name="chevron-right" />
           </button>
         ) : (
           <button type="button" className="btn btn-secondary" onClick={() => goTo(0)}>
-            ↺ Von vorne
+            <Icon name="rotate-ccw" />
+            Von vorne
           </button>
         )}
       </div>
@@ -76,7 +86,7 @@ export function StepThrough({ schritte }: { schritte: AblaufSchritt[] }) {
         {schritte.map((s, i) => (
           <li key={s.titel} className={i === index ? 'steps-list-active' : i < index ? 'steps-list-done' : ''}>
             <button type="button" onClick={() => goTo(i)} aria-current={i === index ? 'step' : undefined}>
-              <span className="steps-list-nr">{i < index ? '✓' : i + 1}</span>
+              <span className="steps-list-nr num">{i < index ? <Icon name="check" size="1em" /> : i + 1}</span>
               <span>{s.titel}</span>
             </button>
           </li>

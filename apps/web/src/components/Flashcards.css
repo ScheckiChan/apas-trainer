@@ -2,14 +2,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .flash-count {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--grey);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.flash-count strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .flash-card {
@@ -18,13 +22,13 @@
   user-select: none;
   perspective: 1200px;
   -webkit-tap-highlight-color: transparent;
-  animation: flash-in 0.25s ease-out;
+  animation: flash-in var(--dur) var(--ease-out);
 }
 
 /* Both faces share one grid cell, so the card is as tall as its longer side. */
 .flash-inner {
   display: grid;
-  transition: transform 0.45s ease;
+  transition: transform var(--dur-slow) var(--ease-out);
   transform-style: preserve-3d;
 }
 
@@ -36,50 +40,49 @@
   grid-area: 1 / 1;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  min-height: 13rem;
-  padding: 1.1rem;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  gap: var(--space-3);
+  min-height: 14rem;
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-lg);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
 
 .flash-front {
-  background: var(--surface);
-  border: 2px solid var(--red);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
 }
 
+/* Answer side: tinted so a glance tells which side is up. */
 .flash-back {
-  background: var(--dark);
-  color: #fff;
+  background: var(--accent-subtle);
+  border: 1px solid color-mix(in oklch, var(--accent) 30%, transparent);
   transform: rotateY(180deg);
 }
 
 .flash-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--red);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .flash-back .flash-label {
-  color: #ff8a80;
+  color: var(--accent-text);
 }
 
 .flash-question {
   flex: 1;
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--text-xl);
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
+  text-wrap: balance;
 }
 
 .flash-answer {
   margin: 0;
-  font-size: 1.02rem;
-  line-height: 1.5;
+  font-size: var(--text-lg);
+  line-height: var(--leading);
 }
 
 ul.flash-answer {
@@ -87,12 +90,15 @@ ul.flash-answer {
 }
 
 ul.flash-answer li + li {
-  margin-top: 0.3rem;
+  margin-top: var(--space-1);
 }
 
 .flash-hint {
-  font-size: 0.8rem;
-  color: var(--grey);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--muted);
 }
 
 .flash-card:focus-visible {
@@ -100,30 +106,35 @@ ul.flash-answer li + li {
 }
 
 .flash-card:focus-visible .flash-face {
-  outline: 3px solid var(--red);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 .flash-nav {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .flash-nav .btn {
   min-height: 3rem;
-  font-size: 1rem;
 }
 
 @keyframes flash-in {
   from {
-    opacity: 0;
-    transform: translateY(0.5rem);
+    opacity: 0.4;
+    transform: translateY(0.375rem);
   }
-  to {
-    opacity: 1;
-    transform: none;
+}
+
+@media (max-width: 480px) {
+  .flash-question {
+    font-size: var(--text-lg);
+  }
+
+  .flash-answer {
+    font-size: var(--text-base);
   }
 }
 
