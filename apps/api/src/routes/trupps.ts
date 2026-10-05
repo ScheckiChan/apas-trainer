@@ -6,17 +6,20 @@ import {
   TRUPP_ICONS,
   TRUPP_NAME_MAX,
   type TruppSummary,
+  type TruppWahl,
   type TeilnehmerCreateResponse,
 } from '@apas/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { db, istMitglied, type MitgliedRecord, type TruppRecord } from '../db.js';
 import { isAusbilder, loadTrupp, requireAusbilder, requireAuth, requireRolle } from '../lib/auth.js';
+import { truppBeitreten } from '../lib/beitreten.js';
 import { emailSchema, emailVergeben, findByEmail, nameSchema, newBenutzerRecord, optionalFfSchema } from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { newId, randomToken } from '../lib/ids.js';
 import { generateTempPassword, hashPassword } from '../lib/password.js';
-import { toTrupp, toTeilnehmer } from '../serialize.js';
+import { toTrupp, toTeilnehmer, truppIconOf } from '../serialize.js';
+import { meResponse } from './auth.js';
 
 export const truppsRouter = Router();
 
@@ -71,6 +74,46 @@ truppsRouter.post('/', requireAusbilder, async (req, res) => {
   };
   await db.trupps.insert(rec);
   res.status(201).json(toTrupp(rec, { includeInvite: true }));
+});
+
+// ---------------------------------------------------------------- Self-service Trupp-Wahl
+// Static segment "waehlbar" — must stay registered before '/:truppId'. Ids (newId) never
+// collide with it. The invite-token routes (routes/join.ts) use '/:token/join|beitreten'.
+
+/**
+ * Every Trupp, reduced to what a Teilnehmer without Trupp needs to pick one: no invite
+ * token, no member names. Any signed-in account (harmless for Ausbilder/Prüfer).
+ */
+truppsRouter.get('/waehlbar', requireAuth, async (_req, res) => {
+  const [trupps, benutzer] = await Promise.all([db.trupps.all(), db.benutzer.all()]);
+  const body: TruppWahl[] = trupps
+    .sort(
+      (a, b) =>
+        (a.pruefungstermin ?? '9999').localeCompare(b.pruefungstermin ?? '9999') || a.name.localeCompare(b.name, 'de'),
+    )
+    .map((trupp) => {
+      const members = benutzer.filter((b) => b.truppId === trupp.id);
+      const besetzung = rollenBesetzung(members);
+      return {
+        id: trupp.id,
+        name: trupp.name,
+        icon: truppIconOf(trupp),
+        pruefungstermin: trupp.pruefungstermin,
+        teilnehmerCount: members.length,
+        offeneRollen: ROLLEN.filter((r) => besetzung[r] === 0),
+        besetzteRollen: ROLLEN.filter((r) => besetzung[r] > 0),
+      };
+    });
+  res.json(body);
+});
+
+/**
+ * Self-join by Trupp id (no invite token). systemRolle 'teilnehmer' only (403 otherwise),
+ * 404 unknown Trupp, idempotent for the same Trupp, 409 if already in another one.
+ */
+truppsRouter.post('/waehlbar/:truppId/beitreten', requireAuth, async (req, res) => {
+  const benutzer = await truppBeitreten(req.benutzer!.id, String(req.params.truppId), { nurTeilnehmer: true });
+  res.json(await meResponse(benutzer));
 });
 
 truppsRouter.get('/:truppId', requireAuth, async (req, res) => {

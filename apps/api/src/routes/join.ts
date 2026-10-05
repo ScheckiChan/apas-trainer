@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db, type BenutzerRecord, type TruppRecord } from '../db.js';
 import { requireAuth } from '../lib/auth.js';
+import { truppBeitreten } from '../lib/beitreten.js';
 import {
   emailSchema,
   emailVergeben,
@@ -28,9 +29,11 @@ import { authSession, meResponse } from './auth.js';
  */
 export const joinRouter = Router();
 
+const EINLADUNG_UNGUELTIG = 'Einladungslink ungültig oder nicht mehr aktiv';
+
 async function truppByInvite(token: string): Promise<TruppRecord> {
   const trupp = await db.trupps.findOne((x) => x.inviteToken === token);
-  if (!trupp) throw new HttpError(404, 'Einladungslink ungültig oder nicht mehr aktiv');
+  if (!trupp) throw new HttpError(404, EINLADUNG_UNGUELTIG);
   return trupp;
 }
 
@@ -81,17 +84,6 @@ joinRouter.post('/:token/join', async (req, res) => {
  */
 joinRouter.post('/:token/beitreten', requireAuth, async (req, res) => {
   const trupp = await truppByInvite(String(req.params.token));
-  const benutzer = await db.benutzer.update((items) => {
-    const b = items.find((x) => x.id === req.benutzer!.id);
-    if (!b) throw new HttpError(401, 'Sitzung abgelaufen oder ungültig — bitte neu anmelden');
-    if (b.truppId === trupp.id) return { items, result: b };
-    if (b.truppId) {
-      throw new HttpError(409, 'Du bist bereits in einem anderen Trupp. Ein Ausbilder kann dich umbuchen.');
-    }
-    b.truppId = trupp.id;
-    b.rolle = null;
-    b.joinedAt = new Date().toISOString();
-    return { items, result: b };
-  });
+  const benutzer = await truppBeitreten(req.benutzer!.id, trupp.id, { nichtGefunden: EINLADUNG_UNGUELTIG });
   res.json(await meResponse(benutzer));
 });

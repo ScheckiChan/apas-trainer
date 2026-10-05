@@ -7,10 +7,10 @@ import {
   emailKey,
   emailSchema,
   emailVergeben,
+  ffSchema,
   findByEmail,
   nameSchema,
   newBenutzerRecord,
-  optionalFfSchema,
   passwordSchema,
 } from '../lib/benutzer.js';
 import { HttpError, parseBody } from '../lib/http.js';
@@ -65,10 +65,14 @@ const registrierenSchema = z.object({
   email: emailSchema,
   name: nameSchema,
   password: passwordSchema,
-  ff: optionalFfSchema,
+  ff: ffSchema,
 });
 
-/** Public. Creates a `teilnehmer` account without Trupp; an Ausbilder attaches it later. */
+/**
+ * Public — the instance-wide invite link (/registrieren). FF is required. Creates a
+ * `teilnehmer` account without Trupp; it then picks one itself (GET /trupps/waehlbar +
+ * POST /trupps/waehlbar/:truppId/beitreten) or an Ausbilder attaches it.
+ */
 authRouter.post('/registrieren', async (req, res) => {
   const input = parseBody(registrierenSchema, req);
   // Hash outside the collection lock — bcrypt is deliberately slow.

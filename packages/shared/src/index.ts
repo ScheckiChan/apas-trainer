@@ -470,13 +470,30 @@ export interface RegistrierenRequest {
   /** Display name. */
   name: string;
   password: string;
-  ff?: string | null;
+  /** Home Feuerwehr — required (cross-FF event). */
+  ff: string;
 }
 
 export interface JoinInfo {
   truppName: string;
   truppIcon: TruppIcon | null;
   pruefungstermin?: string | null;
+}
+
+/**
+ * GET /trupps/waehlbar — one Trupp as offered to a Teilnehmer without Trupp for self-service
+ * joining (POST /trupps/waehlbar/:truppId/beitreten). No invite token, no member names.
+ */
+export interface TruppWahl {
+  id: string;
+  name: string;
+  icon: TruppIcon | null;
+  pruefungstermin: string | null;
+  teilnehmerCount: number;
+  /** ROLLEN with nobody holding them yet, in ROLLEN order. */
+  offeneRollen: Rolle[];
+  /** ROLLEN with at least one holder, in ROLLEN order (duplicates are allowed, so still joinable). */
+  besetzteRollen: Rolle[];
 }
 
 /** POST /trupps/:inviteToken/join — new account, already a member of that Trupp. */

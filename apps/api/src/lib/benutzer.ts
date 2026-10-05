@@ -45,7 +45,13 @@ export const nameSchema = z
   .max(100)
   .transform((n) => n.replace(/\s+/g, ' '));
 
-export const ffSchema = z.string().trim().min(2).max(100);
+/** Required FF (registration, invite-link join). */
+export const ffSchema = z
+  .string({ error: 'Bitte deine Feuerwehr (FF) angeben' })
+  .trim()
+  .min(1, { error: 'Bitte deine Feuerwehr (FF) angeben', abort: true })
+  .min(2, 'FF muss mindestens 2 Zeichen haben')
+  .max(100, 'FF darf höchstens 100 Zeichen haben');
 
 /** Optional FF: empty/missing → null. */
 export const optionalFfSchema = z

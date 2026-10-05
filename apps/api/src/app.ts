@@ -41,7 +41,7 @@ export function createApp() {
   // still sign in, while brute force is capped at 20 wrong passwords per 15 min and IP.
   const loginLimiter = strict({ limit: 20, skipSuccessfulRequests: true });
   // Registering / joining creates or changes accounts — every attempt counts. One shared
-  // budget for all three endpoints.
+  // budget for all four endpoints.
   const accountLimiter = strict({ limit: 30 });
 
   app.use('/api', apiLimiter);
@@ -53,6 +53,7 @@ export function createApp() {
   app.post('/api/auth/registrieren', accountLimiter);
   app.post('/api/trupps/:token/join', accountLimiter);
   app.post('/api/trupps/:token/beitreten', accountLimiter);
+  app.post('/api/trupps/waehlbar/:truppId/beitreten', accountLimiter);
 
   app.use('/api/auth', authRouter);
   app.use('/api/benutzer', benutzerRouter);
