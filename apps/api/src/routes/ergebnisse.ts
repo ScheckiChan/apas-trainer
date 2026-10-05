@@ -39,11 +39,14 @@ ergebnisseRouter.get('/', requireAuth, async (req, res) => {
  * only for their own Trupp (kannErgebnisSpeichern in shared).
  */
 ergebnisseRouter.put('/:stationId', requireAuth, async (req, res) => {
-  const trupp = await db.trupps.get(String(req.params.truppId));
-  if (!trupp) throw new HttpError(404, 'Trupp nicht gefunden');
-  if (!kannErgebnisSpeichern(req.benutzer!, trupp.id)) {
+  // Permission first, existence second: a Teilnehmer gets the same 403 for a foreign and
+  // a nonexistent Trupp id, so this endpoint doesn't reveal which Trupp ids exist.
+  const truppId = String(req.params.truppId);
+  if (!kannErgebnisSpeichern(req.benutzer!, truppId)) {
     throw new HttpError(403, 'Als Teilnehmer kannst du Ergebnisse nur für deinen eigenen Trupp speichern');
   }
+  const trupp = await db.trupps.get(truppId);
+  if (!trupp) throw new HttpError(404, 'Trupp nicht gefunden');
   const stationId = String(req.params.stationId);
   if (!isStationId(stationId)) throw new HttpError(404, 'Station nicht gefunden');
   const input = parseBody(ergebnisSchema, req);

@@ -22,7 +22,10 @@ export function createApp() {
   if (config.corsOrigins.length) {
     app.use(cors({ origin: config.corsOrigins, allowedHeaders: ['Content-Type', 'Authorization'] }));
   }
-  app.use(express.json({ limit: '100kb' }));
+  // The Wappen upload reads its raw body itself (routes/einstellungen.ts) and decides the
+  // type by sniffing, so a JSON Content-Type there must not hit the JSON parser.
+  const jsonParser = express.json({ limit: '100kb' });
+  app.use((req, res, next) => (req.path === '/api/einstellungen/wappen' ? next() : jsonParser(req, res, next)));
 
   // General limiter for the whole API, stricter ones for the unauthenticated auth endpoints.
   const apiLimiter = rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false });
